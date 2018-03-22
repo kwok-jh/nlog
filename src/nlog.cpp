@@ -43,12 +43,12 @@ private:
 //////////////////////////////////////////////////////////////////////////
 //CLog static function
 std::map<uint32_t, CLog*> CLog::__sMapInstance;
-helper::CCritSec          CLog::__mapCsec;
+CSimpleLock               CLog::__mapCsec;
 
 CLog& 
 CLog::Instance( uint32_t id /*= -1*/ )
 {
-    helper::CAutolock lock(&__mapCsec);
+    CAutolock lock(&__mapCsec);
 
     std::map<uint32_t, CLog*>::iterator i = __sMapInstance.find(id);
     if(i == __sMapInstance.end())
@@ -64,7 +64,7 @@ CLog::Release( uint32_t id /*= -1*/ )
 {
     CLog* _this = 0;
     {
-        helper::CAutolock lock(&__mapCsec);
+        CAutolock lock(&__mapCsec);
 
         std::map<uint32_t, CLog*>::iterator i = __sMapInstance.find(id);
         if(i == __sMapInstance.end())
@@ -94,7 +94,7 @@ CLog::Release( uint32_t id /*= -1*/ )
 bool 
 CLog::ReleaseAll()
 {
-    helper::CAutolock lock(&__mapCsec);
+    CAutolock lock(&__mapCsec);
 
     std::map<uint32_t, CLog*>::iterator i = __sMapInstance.begin();
     while(i != __sMapInstance.end())
@@ -161,7 +161,7 @@ CLog::SetLevel( LogLevel level )
 bool 
 CLog::InitLog()
 {
-    helper::CAutolock lock(&__mapCsec);
+    CAutolock lock(&__mapCsec);
 
     if(__bAlreadyInit)
     {
@@ -199,10 +199,7 @@ CLog::InitLog()
     {
 #ifdef UNICODE
         /*如果是Unicode则写入BOM, 文件头LE:0xfffe BE:0xfeff*/
-        CLogIO* pIo = new CLogIO(tstring(1, 0xfeff), __liNextOffset);
-        ::InterlockedExchangeAdd64(&__liNextOffset.QuadPart, pIo->Size());
-        ::WriteFile( __hFile, pIo->szBuf(), pIo->Size(), NULL, pIo );
-        ::InterlockedIncrement(&__count);
+        WriteLog(tstring(1, 0xfeff));
 #endif
     }
 
@@ -273,7 +270,14 @@ CLog&
 CLog::FormatWriteLog( const tstring& strBuf, const LogInfomation& info /*= Loginfomation()*/ )
 {
     if(__filterLevel >= info.level)
+    {
+        if(!__bAlreadyInit)
+        {
+            InitLog();
+        }
+
         return WriteLog(Format(__config.prefixion, info) + strBuf + _T("\r\n"));
+    }
     else
         return *this;
 }
@@ -281,17 +285,11 @@ CLog::FormatWriteLog( const tstring& strBuf, const LogInfomation& info /*= Login
 CLog& 
 CLog::WriteLog( const tstring& strBuf )
 {
-    if(!__bAlreadyInit)
-    {
-        //根据配置初始化
-        InitLog();
-    }
-
     CompleteHandle();
 
     CLogIO* pIo = NULL;
     {
-        helper::CAutolock lock(&__mapCsec);
+        CAutolock lock(&__mapCsec);
         pIo = new CLogIO(strBuf, __liNextOffset);
         ::InterlockedExchangeAdd64(&__liNextOffset.QuadPart, pIo->Size());
     }
@@ -299,6 +297,16 @@ CLog::WriteLog( const tstring& strBuf )
     //投递重叠IO
     ::WriteFile( __hFile, pIo->szBuf(), pIo->Size(), NULL, pIo );
     ::InterlockedIncrement(&__count);
+
+    if(GetLastError() == ERROR_IO_PENDING)
+    {
+        /*
+            MSDN:The error code WSA_IO_PENDING indicates that the overlapped operation 
+            has been successfully initiated and that completion will be indicated at a 
+            later time.
+        */
+        SetLastError(S_OK);
+    }
     return *this;
 }
 

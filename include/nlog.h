@@ -12,6 +12,7 @@
 */
 
 #include "helper.h"
+#include "autolock.h"
 #include "strconvert.h"
 
 #ifndef _WINDOWS_
@@ -54,7 +55,7 @@ class CLog
     friend CLogHelper& time(CLogHelper& slef);
 
     static std::map<uint32_t, CLog*> __sMapInstance;
-    static helper::CCritSec          __mapCsec;
+    static CSimpleLock               __mapCsec;
 public:
     static CLog& Instance(uint32_t id = -1);
     static bool  Release(uint32_t id = -1);
@@ -119,7 +120,7 @@ public:
     {
         va_list marker = NULL;  
         va_start(marker, _Format);  
-        __strbuf << helper::_StrFormat(_Format, marker);
+        __strbuf << helper::StrFormatVar(_Format, marker);
         va_end(marker);
 
         return *this;
@@ -131,7 +132,7 @@ public:
 
         va_list marker = NULL;  
         va_start(marker, _Format);  
-        __strbuf << helper::_StrFormat(_Format, marker);
+        __strbuf << helper::StrFormatVar(_Format, marker);
         va_end(marker);
 
         return *this;
