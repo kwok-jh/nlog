@@ -149,6 +149,12 @@ CLog::SetConfig( const Config& setting )
     return true;
 }
 
+nlog::Config 
+CLog::GetConfig() const
+{
+    return __config;
+}
+
 LogLevel 
 CLog::SetLevel( LogLevel level )
 {

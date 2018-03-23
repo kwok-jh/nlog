@@ -62,6 +62,7 @@ public:
     static bool  ReleaseAll();
 
     bool     SetConfig(const Config& setting);
+    Config   GetConfig() const;
     LogLevel SetLevel(LogLevel level); 
 protected:
     bool    InitLog();
