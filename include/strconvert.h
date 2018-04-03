@@ -106,4 +106,9 @@ public:
 
         return buff;
     }
+
+    static std::string Utf82Str(const std::string& str)
+    {
+        return WStr2Str( Utf82WStr(str) );
+    }
 };
