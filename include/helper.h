@@ -68,10 +68,9 @@ public:
     static tstring GetDateTime(const tstring& format)
     {
         /*
-            格式: %y %m %d %H %M %S %Z 分别是 年 月 日 时 分 秒 时区
-            详见: https://msdn.microsoft.com/en-us/library/fe06s4ak(v=vs.60).aspx
+            格式: %y %m %d %H %M %S 分别是 年 月 日 时 分 秒
         */
-        return (LPCTSTR)CTime::GetCurrentTime().FormatGmt(format.c_str());
+        return (LPCTSTR)CTime::GetCurrentTime().Format(format.c_str());
     }
 
     static tstring GetModulePath(HMODULE hModule = 0)
