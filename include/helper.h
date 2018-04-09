@@ -6,6 +6,8 @@
 #include <stdarg.h>
 #include <assert.h>
 
+#include <list>
+#include <vector>
 #include <string>
 #include <sstream> 
 #include <fstream>
@@ -73,6 +75,11 @@ public:
         return (LPCTSTR)CTime::GetCurrentTime().Format(format.c_str());
     }
 
+    static tstring FormatFileTime(const tstring& format, const FILETIME time)
+    {
+        return (LPCTSTR)CTime::CTime(time).Format(format.c_str());
+    }
+
     static tstring GetModulePath(HMODULE hModule = 0)
     {
         tstring modulePath(MAX_PATH, 0);
@@ -113,9 +120,31 @@ public:
             return false;
     }
 
-    static bool FilePathIsExist(const tstring& fileName, bool is_directory)
+    static bool DeleteFileOrDir(const tstring& path)
     {
-        const DWORD file_attr = ::GetFileAttributes(fileName.c_str());
+        DWORD attributes = ::GetFileAttributes(path.c_str());
+        if (attributes == INVALID_FILE_ATTRIBUTES) // not exists
+            return true;
+
+        SHFILEOPSTRUCT file_op = {
+            NULL,
+            FO_DELETE,
+            path.c_str(),
+            _T(""),
+            FOF_NOCONFIRMATION|FOF_NOERRORUI|FOF_SILENT,
+            FALSE,
+            0,
+            _T("")};
+
+            if (::SHFileOperation(&file_op) && !file_op.fAnyOperationsAborted)
+                return true;
+
+            return false;
+    }
+
+    static bool FilePathIsExist(const tstring& fileName, bool is_directory = true)
+    {
+        DWORD file_attr = ::GetFileAttributes(fileName.c_str());
         if (file_attr != INVALID_FILE_ATTRIBUTES)
         {
             if (is_directory)
@@ -124,6 +153,119 @@ public:
                 return true;
         }
         return false;
+    }
+
+    static std::list<tstring> EnumDir(const tstring& dir, int type = -1, const tstring& filter = _T("*.*"),
+        bool recur = true)
+    {
+        std::list<tstring> resultList;
+
+        WIN32_FIND_DATA file_data;
+        tstring path = dir + _T("\\") + filter;
+
+        HANDLE hFile = ::FindFirstFile(path.c_str(), &file_data);
+        while( hFile != INVALID_HANDLE_VALUE )
+        {
+            if( file_data.cFileName[0] != _T('.') )
+            {
+                switch(type)
+                {
+                    /*所有文件*/
+                case -1:
+                    break;
+
+                    /*仅文件*/
+                case 0:
+                    if( file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+                    {
+                        continue;
+                    }
+                    break;
+
+                    /*仅文件夹*/
+                case 1:
+                    if( file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+                    {
+                        break;
+                    }
+                    continue;
+                }
+
+                tstring targetName = dir + _T("\\") + file_data.cFileName;
+                resultList.push_back(targetName);
+
+                /*递归目录*/
+                if( recur && file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
+                {
+                    resultList.merge( EnumDir(targetName, type, filter, recur) );
+                }
+            }
+
+            if( ::FindNextFile(hFile, &file_data) == FALSE )
+            {
+                break;
+            }
+        }
+
+        ::FindClose(hFile);
+        return resultList;
+    }
+
+    static uint64_t GetFileSize(const tstring& fileName)
+    {
+        HANDLE hFile = CreateFile( 
+            fileName.c_str(),           // lpFileName
+            FILE_READ_ATTRIBUTES,       // dwDesiredAccess
+            FILE_SHARE_READ,            // dwShareMode
+            NULL,                       // lpSecurityAttributes
+            OPEN_EXISTING,              // dwCreationDisposition
+            FILE_ATTRIBUTE_NORMAL,      // dwFlagsAndAttributes
+            NULL );                     // hTemplateFile
+
+        if(hFile != INVALID_HANDLE_VALUE)
+        {
+            LARGE_INTEGER large;
+            if(::GetFileSizeEx(hFile, &large) != 0)
+            {
+                CloseHandle (hFile);
+                return large.QuadPart;
+            }
+        }
+
+        //failed GetLastError
+        CloseHandle (hFile);
+        return 0;
+    }
+
+    static std::vector<FILETIME> GetFileTime(const tstring& fileName)
+    {
+        HANDLE hFile = CreateFile( 
+            fileName.c_str(),           // lpFileName
+            GENERIC_READ ,              // dwDesiredAccess
+            FILE_SHARE_READ,            // dwShareMode
+            NULL,                       // lpSecurityAttributes
+            OPEN_EXISTING,              // dwCreationDisposition
+            FILE_ATTRIBUTE_NORMAL,      // dwFlagsAndAttributes
+            NULL );                     // hTemplateFile
+
+        std::vector<FILETIME> timeVec;
+
+        if(hFile != INVALID_HANDLE_VALUE)
+        {
+            if( ::GetFileTime(hFile, 
+                &timeVec[0],           //CreationTime 
+                &timeVec[1],           //LastAccessTime
+                &timeVec[2] )          //LastWriteTime
+                != 0 )
+            {
+                CloseHandle (hFile);
+                return timeVec;
+            }
+        }
+
+        //failed
+        ::CloseHandle (hFile);
+        return timeVec;
     }
 
     static bool IsLittleEndian()
