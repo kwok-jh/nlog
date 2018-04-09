@@ -70,7 +70,8 @@ public:
     static tstring GetDateTime(const tstring& format)
     {
         /*
-            格式: %y %m %d %H %M %S 分别是 年 月 日 时 分 秒
+            格式: %Y(%y) %m %d %H %M %S 分别是 年 月 日 时 分 秒
+            see: https://msdn.microsoft.com/zh-tw/library/fe06s4ak.aspx
         */
         return (LPCTSTR)CTime::GetCurrentTime().Format(format.c_str());
     }
@@ -219,7 +220,7 @@ public:
             FILE_SHARE_READ,            // dwShareMode
             NULL,                       // lpSecurityAttributes
             OPEN_EXISTING,              // dwCreationDisposition
-            FILE_ATTRIBUTE_NORMAL,      // dwFlagsAndAttributes
+            FILE_FLAG_BACKUP_SEMANTICS, // dwFlagsAndAttributes
             NULL );                     // hTemplateFile
 
         if(hFile != INVALID_HANDLE_VALUE)
@@ -245,10 +246,10 @@ public:
             FILE_SHARE_READ,            // dwShareMode
             NULL,                       // lpSecurityAttributes
             OPEN_EXISTING,              // dwCreationDisposition
-            FILE_ATTRIBUTE_NORMAL,      // dwFlagsAndAttributes
+            FILE_FLAG_BACKUP_SEMANTICS, // dwFlagsAndAttributes
             NULL );                     // hTemplateFile
 
-        std::vector<FILETIME> timeVec;
+        std::vector<FILETIME> timeVec(3);
 
         if(hFile != INVALID_HANDLE_VALUE)
         {
