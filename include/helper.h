@@ -64,7 +64,12 @@ public:
 
     static tstring GetName(const tstring& path)
     {
-        return path.substr(path.rfind(_T("\\")) + 1, tstring::npos);
+        size_t pos = path.length() - 1;
+        while( pos >= 0 && path.at(pos) == _T('\\') )
+            --pos;
+
+        size_t findPos = path.rfind(_T("\\"), pos);
+        return path.substr(findPos + 1, pos - findPos);
     }
 
     static tstring GetDateTime(const tstring& format)
