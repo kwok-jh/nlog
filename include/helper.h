@@ -281,4 +281,31 @@ public:
         return *buf8 == 0xff;
     }
 
+    static bool IsWow64()
+    {
+        static bool bIsRead  = false;
+        static BOOL bIsWow64 = false;
+
+        if(!bIsRead)
+        {
+            //32位进程运行在64位系统下返回true
+            typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS)(HANDLE, PBOOL);
+            LPFN_ISWOW64PROCESS fnIsWow64Process = (LPFN_ISWOW64PROCESS)GetProcAddress(
+                GetModuleHandle(TEXT("kernel32")),"IsWow64Process");
+
+            if(NULL != fnIsWow64Process)
+            {
+                if (!fnIsWow64Process(GetCurrentProcess(),&bIsWow64))
+                {
+                    //handle error
+                    assert(0);
+                }
+            }
+
+            bIsRead = true;
+        }
+
+        return !!bIsWow64;
+    }
+
 };
