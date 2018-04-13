@@ -11,9 +11,9 @@
     * LOG_ERR("你好, %s", "nlog") << " 现在时间:" << nlog::time;
 */
 
-#include "helper.h"
-#include "autolock.h"
-#include "strconvert.h"
+#include "helper.hpp"
+#include "simplelock.hpp"
+#include "strconvert.hpp"
 
 #ifndef _WINDOWS_
 #error "仅支持Windows平台"

@@ -75,12 +75,14 @@
     <ClCompile Include="..\src\nlog.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\autolock.h" />
-    <ClInclude Include="..\include\helper.h" />
-    <ClInclude Include="..\include\iocp.h" />
+    <ClInclude Include="..\include\simplelock.hpp" />
+    <ClInclude Include="..\include\helper.hpp" />
+    <ClInclude Include="..\include\iocp.hpp" />
     <ClInclude Include="..\include\nlog.h" />
-    <ClInclude Include="..\include\regwrap.h" />
-    <ClInclude Include="..\include\strconvert.h" />
+    <ClInclude Include="..\include\strconvert.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="copy.bat" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

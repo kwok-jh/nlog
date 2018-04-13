@@ -20,23 +20,25 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\helper.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\nlog.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\regwrap.h">
+    <ClInclude Include="..\include\helper.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\strconvert.h">
+    <ClInclude Include="..\include\strconvert.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\iocp.h">
+    <ClInclude Include="..\include\iocp.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\autolock.h">
+    <ClInclude Include="..\include\simplelock.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="copy.bat">
+      <Filter>资源文件</Filter>
+    </None>
   </ItemGroup>
 </Project>
