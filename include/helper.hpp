@@ -78,20 +78,33 @@ public:
             格式: %Y(%y) %m %d %H %M %S 分别是 年 月 日 时 分 秒
             see: https://msdn.microsoft.com/zh-tw/library/fe06s4ak.aspx
         */
-        return (LPCTSTR)CTime::GetCurrentTime().Format(format.c_str());
+       return (LPCTSTR)CTime::GetCurrentTime().Format(format.c_str());
     }
 
-    static tstring FormatFileTime(const tstring& format, const FILETIME time)
+    static tstring GetDateTime(const tstring& format, FILETIME ft)
     {
-        return (LPCTSTR)CTime::CTime(time).Format(format.c_str());
+        return (LPCTSTR)CTime::CTime(ft).Format(format.c_str());
+    }
+
+    static tstring GetModuleName(HMODULE hModule = 0)
+    {
+        TCHAR buffer[MAX_PATH];
+        ::GetModuleFileName(hModule, buffer, sizeof buffer);
+
+        return buffer;
     }
 
     static tstring GetModulePath(HMODULE hModule = 0)
     {
-        tstring modulePath(MAX_PATH, 0);
-        ::GetModuleFileName(hModule, (TCHAR*)modulePath.data(), modulePath.size());
+        return GetPath(GetModuleName());
+    }
 
-        return GetPath(modulePath);
+    static tstring GetSysDir()
+    {
+        TCHAR buffer[MAX_PATH];
+        ::GetSystemDirectory(buffer, sizeof buffer);
+
+        return buffer;
     }
 
     static bool CreateDirRecursively(const tstring& dir)
@@ -278,6 +291,7 @@ public:
     {
         uint16_t buf16 = 0x00ff;
         uint8_t* buf8 = (uint8_t*)&buf16;
+
         return *buf8 == 0xff;
     }
 
@@ -306,6 +320,20 @@ public:
         }
 
         return !!bIsWow64;
+    }
+
+    static bool Is64BitWindows()
+    {
+#if defined(_WIN64)
+
+        return true; // 64-bit programs run only on Win64
+
+#else // _WIN32
+
+        // 32-bit programs run on both 32-bit and 64-bit Windows
+        // so must sniff
+        return IsWow64();
+#endif
     }
 
 };
