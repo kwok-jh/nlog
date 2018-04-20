@@ -107,6 +107,18 @@ public:
         __logInfo.line  = line;
     }
 
+    CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid)
+        : __sessionId(guid)
+    {
+        __logInfo.level = level;
+#ifdef UNICODE
+        __logInfo.file  = helper::GetName(Conver::Str2WStr(file));
+#else
+        __logInfo.file  = helper::GetName(file);
+#endif
+        __logInfo.line  = line;
+    }
+
     ~CLogHelper()
     {
         CLog::Instance(__sessionId).FormatWriteLog(__strbuf.str(), __logInfo);
@@ -119,18 +131,6 @@ public:
 
     CLogHelper& Format(const TCHAR * _Format, ...) 
     {
-        va_list marker = NULL;  
-        va_start(marker, _Format);  
-        __strbuf << helper::StrFormatVar(_Format, marker);
-        va_end(marker);
-
-        return *this;
-    }
-
-    CLogHelper& Format(std::string guid, const TCHAR * _Format, ...)
-    {
-        __sessionId = guid;
-
         va_list marker = NULL;  
         va_start(marker, _Format);  
         __strbuf << helper::StrFormatVar(_Format, marker);
@@ -166,3 +166,8 @@ protected:
 #define LOG_WAR  nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__).Format
 #define LOG_APP  nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__).Format
 #define LOG_PRO  nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__).Format
+
+#define LOG_ERR_WITH_ID(id) nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, id).Format
+#define LOG_WAR_WITH_ID(id) nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, id).Format
+#define LOG_APP_WITH_ID(id) nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__, id).Format
+#define LOG_PRO_WITH_ID(id) nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__, id).Format
