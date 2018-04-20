@@ -20,6 +20,10 @@ typedef std::string         tstring;
 typedef std::stringstream   tsstream;
 #endif
 
+/* 使用string容器作为byte缓冲区 */
+typedef std::string         bytedata;
+
+
 #include <shlobj.h>     // SHCreateDirectory
 #include <shellapi.h>   // SHFileOperation
 #include <atltime.h>    // CTime
@@ -114,14 +118,11 @@ public:
             || result == ERROR_ALREADY_EXISTS);
     }
 
-    static bool DeleteDirRecursively(const tstring& dir)
+    static bool DeleteRecursively(const tstring& dir)
     {
         DWORD attributes = ::GetFileAttributes(dir.c_str());
         if (attributes == INVALID_FILE_ATTRIBUTES) // not exists
             return true;
-
-        if (!(attributes & FILE_ATTRIBUTE_DIRECTORY)) // not a file
-            return false;
 
         SHFILEOPSTRUCT file_op = {
             NULL,
@@ -133,29 +134,7 @@ public:
             0,
             _T("")};
 
-            if (::SHFileOperation(&file_op) && !file_op.fAnyOperationsAborted)
-                return true;
-
-            return false;
-    }
-
-    static bool DeleteFileOrDir(const tstring& path)
-    {
-        DWORD attributes = ::GetFileAttributes(path.c_str());
-        if (attributes == INVALID_FILE_ATTRIBUTES) // not exists
-            return true;
-
-        SHFILEOPSTRUCT file_op = {
-            NULL,
-            FO_DELETE,
-            path.c_str(),
-            _T(""),
-            FOF_NOCONFIRMATION|FOF_NOERRORUI|FOF_SILENT,
-            FALSE,
-            0,
-            _T("")};
-
-            if (::SHFileOperation(&file_op) && !file_op.fAnyOperationsAborted)
+            if (!::SHFileOperation(&file_op) && !file_op.fAnyOperationsAborted)
                 return true;
 
             return false;
@@ -171,6 +150,21 @@ public:
             else
                 return true;
         }
+        return false;
+    }
+
+    static bool FileWrite(const tstring& fileName, const bytedata& bytes)
+    {
+        std::ofstream ofile(fileName, std::ios::out | std::ios::trunc | std::ios_base::binary);
+
+        if(ofile)
+        {
+            ofile << bytes;
+            ofile.close();
+
+            return true;
+        }
+
         return false;
     }
 

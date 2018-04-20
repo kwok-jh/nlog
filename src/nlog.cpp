@@ -42,31 +42,31 @@ private:
 
 //////////////////////////////////////////////////////////////////////////
 //CLog static function
-std::map<uint32_t, CLog*> CLog::__sMapInstance;
-CSimpleLock               CLog::__mapCsec;
+std::map<std::string, CLog*> CLog::__sMapInstance;
+CSimpleLock                  CLog::__mapCsec;
 
 CLog& 
-CLog::Instance( uint32_t id /*= -1*/ )
+CLog::Instance( std::string guid /*= ""*/ )
 {
     CAutolock lock(&__mapCsec);
 
-    std::map<uint32_t, CLog*>::iterator i = __sMapInstance.find(id);
+    std::map<std::string, CLog*>::iterator i = __sMapInstance.find(guid);
     if(i == __sMapInstance.end())
     {
-        __sMapInstance[id] = new CLog();
+        __sMapInstance[guid] = new CLog();
     }
 
-    return *__sMapInstance[id];
+    return *__sMapInstance[guid];
 }
 
 bool 
-CLog::Release( uint32_t id /*= -1*/ )
+CLog::Release( std::string guid /*= ""*/ )
 {
     CLog* _this = 0;
     {
         CAutolock lock(&__mapCsec);
 
-        std::map<uint32_t, CLog*>::iterator i = __sMapInstance.find(id);
+        std::map<std::string, CLog*>::iterator i = __sMapInstance.find(guid);
         if(i == __sMapInstance.end())
         {
             return false;
@@ -96,7 +96,7 @@ CLog::ReleaseAll()
 {
     CAutolock lock(&__mapCsec);
 
-    std::map<uint32_t, CLog*>::iterator i = __sMapInstance.begin();
+    std::map<std::string, CLog*>::iterator i = __sMapInstance.begin();
     while(i != __sMapInstance.end())
     {
         Release(i->first);

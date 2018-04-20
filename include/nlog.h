@@ -5,10 +5,11 @@
     * 创建:  2016-6-16
     * 修改:  2018-3-15
     * Email：<kwok-jh@qq.com>
+    * Git:   https://gitee.com/skygarth/nlog
 	
 	* 异步
     * 多线程安全
-    * LOG_ERR("你好, %s", "nlog") << " 现在时间:" << nlog::time;
+    * LOG_ERR("Hello, %s", "nlog") << " 现在时间:" << nlog::time;
 */
 
 #include "helper.hpp"
@@ -54,11 +55,11 @@ class CLog
     friend class CLogHelper;
     friend CLogHelper& time(CLogHelper& slef);
 
-    static std::map<uint32_t, CLog*> __sMapInstance;
-    static CSimpleLock               __mapCsec;
+    static std::map<std::string, CLog*> __sMapInstance;
+    static CSimpleLock                  __mapCsec;
 public:
-    static CLog& Instance(uint32_t id = -1);
-    static bool  Release(uint32_t id = -1);
+    static CLog& Instance(std::string guid = "");
+    static bool  Release (std::string guid = "");
     static bool  ReleaseAll();
 
     bool     SetConfig(const Config& setting);
@@ -83,10 +84,9 @@ private:
     Config   __config;
     bool     __bAlreadyInit;
     LogLevel __filterLevel;
-    volatile uint32_t __count;
 
+    volatile uint32_t __count;
     LARGE_INTEGER __liNextOffset;
-    std::map<uint32_t, tsstream*> __mapStream;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -96,7 +96,7 @@ class CLogHelper
 {
 public:
     CLogHelper(LogLevel level, const char* file, const uint32_t line)
-        : __sessionId(-1)
+        : __sessionId("")
     {
         __logInfo.level = level;
 #ifdef UNICODE
@@ -127,9 +127,9 @@ public:
         return *this;
     }
 
-    CLogHelper& Format(uint32_t id, const TCHAR * _Format, ...)
+    CLogHelper& Format(std::string guid, const TCHAR * _Format, ...)
     {
-        __sessionId = id;
+        __sessionId = guid;
 
         va_list marker = NULL;  
         va_start(marker, _Format);  
@@ -156,7 +156,7 @@ public:
 
 protected:
     tsstream __strbuf;
-    uint32_t __sessionId;
+    std::string __sessionId;
     CLog::LogInfomation __logInfo;
 };
 
