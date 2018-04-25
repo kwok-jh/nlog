@@ -96,9 +96,10 @@ public:
     CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid = "")
         : __sessionId(guid)
     {
-        __logInfo.file  = totstr(strrchr(file, '\\') + 1);
-        __logInfo.level = level;
-        __logInfo.line  = line;
+        const char* fname = strrchr(file, '\\');
+        __logInfo.file    = totstr(fname ? fname + 1 : file);
+        __logInfo.level   = level;
+        __logInfo.line    = line;
     }
 
     ~CLogHelper()
@@ -120,7 +121,7 @@ public:
         _vstprintf_s(&text[0], text.capacity(), _Format, marker);
         va_end(marker);
 
-        __strbuf << text;
+        __strbuf << text.data();
         return *this;
     }
 
@@ -128,28 +129,6 @@ public:
     CLogHelper& operator<<(T info)
     {
         __strbuf << info;
-        return *this;
-    }
-
-    template<>
-    CLogHelper& operator<<(const std::string& info)
-    {
-#ifdef UNICODE
-        __strbuf << Conver::Str2WStr(info);
-#else
-        __strbuf << info;
-#endif
-        return *this;
-    }
-
-    template<>
-    CLogHelper& operator<<(const std::wstring& info)
-    {
-#ifdef UNICODE
-        __strbuf << info;
-#else
-        __strbuf << Conver::WStr2Str(info);
-#endif
         return *this;
     }
 

@@ -22,7 +22,7 @@ public:
         _vstprintf_s(&text[0], text.capacity(), _Format, marker);
         va_end(marker);
 
-        return text;
+        return text.data();
     }
 
     static tstring& StrReplace(tstring& target, const tstring& before, const tstring& after)  
