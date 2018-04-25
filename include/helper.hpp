@@ -43,7 +43,12 @@ public:
 
     static tstring GetPath(const tstring& fileName)
     {
-        return fileName.substr(0, fileName.rfind(_T("\\")));
+        size_t pos = fileName.length() - 1;
+        while( pos >= 0 && fileName.at(pos) == _T('\\') )
+            --pos;
+
+        size_t findPos = fileName.rfind(_T("\\"), pos);
+        return fileName.substr(0, findPos);
     }
 
     static tstring GetName(const tstring& path)
