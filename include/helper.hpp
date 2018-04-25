@@ -1,48 +1,28 @@
 #pragma once
 
 #include <windows.h>
-#include <stdint.h>
-#include <tchar.h>
 #include <stdarg.h>
 #include <assert.h>
-
-#include <list>
-#include <vector>
-#include <string>
-#include <sstream> 
-#include <fstream>
-
-#ifdef UNICODE
-typedef std::wstring        tstring; 
-typedef std::wstringstream  tsstream;
-#else
-typedef std::string         tstring;
-typedef std::stringstream   tsstream;
-#endif
-
-/* 使用string容器作为byte缓冲区 */
-typedef std::string         bytedata;
-
 
 #include <shlobj.h>     // SHCreateDirectory
 #include <shellapi.h>   // SHFileOperation
 #include <atltime.h>    // CTime
 
+#include "config.h"
+
 class helper
 {
 public:
-    static tstring StrFormatVar(const TCHAR * _Format, va_list marker)
-    {
-        tstring result(_vsctprintf(_Format, marker) + 1, 0);
-        _vstprintf_s((TCHAR *)result.data(), result.capacity(), _Format, marker); 
-        return result.data();
-    }
-
     static tstring StrFormat(const TCHAR * _Format, ...) 
     {  
         va_list marker = NULL;  
         va_start(marker, _Format);
-        return StrFormatVar(_Format, marker);
+
+        tstring text(_vsctprintf(_Format, marker) + 1, 0);
+        _vstprintf_s(&text[0], text.capacity(), _Format, marker);
+        va_end(marker);
+
+        return text;
     }
 
     static tstring& StrReplace(tstring& target, const tstring& before, const tstring& after)  
@@ -140,17 +120,9 @@ public:
             return false;
     }
 
-    static bool FilePathIsExist(const tstring& fileName, bool is_directory = true)
+    static bool FilePathIsExist(const tstring& name)
     {
-        DWORD file_attr = ::GetFileAttributes(fileName.c_str());
-        if (file_attr != INVALID_FILE_ATTRIBUTES)
-        {
-            if (is_directory)
-                return (file_attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
-            else
-                return true;
-        }
-        return false;
+        return ::GetFileAttributes(name.c_str()) != INVALID_FILE_ATTRIBUTES;
     }
 
     static bool FileWrite(const tstring& fileName, const bytedata& bytes)
@@ -190,17 +162,13 @@ public:
                     /*仅文件*/
                 case 0:
                     if( file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
-                    {
                         continue;
-                    }
                     break;
 
                     /*仅文件夹*/
                 case 1:
                     if( file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
-                    {
                         break;
-                    }
                     continue;
                 }
 
@@ -215,9 +183,7 @@ public:
             }
 
             if( ::FindNextFile(hFile, &file_data) == FALSE )
-            {
                 break;
-            }
         }
 
         ::FindClose(hFile);

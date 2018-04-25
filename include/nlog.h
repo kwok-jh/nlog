@@ -12,7 +12,7 @@
     * LOG_ERR("Hello, %s", "nlog") << " 现在时间:" << nlog::time;
 */
 
-#include "helper.hpp"
+#include "config.h"
 #include "simplelock.hpp"
 #include "strconvert.hpp"
 
@@ -90,32 +90,14 @@ private:
 };
 
 //////////////////////////////////////////////////////////////////////////
-
-
 class CLogHelper
 {
 public:
-    CLogHelper(LogLevel level, const char* file, const uint32_t line)
-        : __sessionId("")
-    {
-        __logInfo.level = level;
-#ifdef UNICODE
-        __logInfo.file  = helper::GetName(Conver::Str2WStr(file));
-#else
-        __logInfo.file  = helper::GetName(file);
-#endif
-        __logInfo.line  = line;
-    }
-
-    CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid)
+    CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid = "")
         : __sessionId(guid)
     {
+        __logInfo.file  = totstr(strrchr(file, '\\') + 1);
         __logInfo.level = level;
-#ifdef UNICODE
-        __logInfo.file  = helper::GetName(Conver::Str2WStr(file));
-#else
-        __logInfo.file  = helper::GetName(file);
-#endif
         __logInfo.line  = line;
     }
 
@@ -131,11 +113,14 @@ public:
 
     CLogHelper& Format(const TCHAR * _Format, ...) 
     {
-        va_list marker = NULL;  
-        va_start(marker, _Format);  
-        __strbuf << helper::StrFormatVar(_Format, marker);
+        va_list  marker = nullptr;  
+        va_start(marker, _Format);
+
+        tstring text(_vsctprintf(_Format, marker) + 1, 0);
+        _vstprintf_s(&text[0], text.capacity(), _Format, marker);
         va_end(marker);
 
+        __strbuf << text;
         return *this;
     }
 
@@ -143,6 +128,28 @@ public:
     CLogHelper& operator<<(T info)
     {
         __strbuf << info;
+        return *this;
+    }
+
+    template<>
+    CLogHelper& operator<<(const std::string& info)
+    {
+#ifdef UNICODE
+        __strbuf << Conver::Str2WStr(info);
+#else
+        __strbuf << info;
+#endif
+        return *this;
+    }
+
+    template<>
+    CLogHelper& operator<<(const std::wstring& info)
+    {
+#ifdef UNICODE
+        __strbuf << info;
+#else
+        __strbuf << Conver::WStr2Str(info);
+#endif
         return *this;
     }
 

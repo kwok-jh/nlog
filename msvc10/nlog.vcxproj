@@ -24,7 +24,7 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>MultiByte</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -73,6 +73,7 @@
     <ClCompile Include="..\src\nlog.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\config.h" />
     <ClInclude Include="..\include\simplelock.hpp" />
     <ClInclude Include="..\include\helper.hpp" />
     <ClInclude Include="..\include\iocp.hpp" />

@@ -1,5 +1,6 @@
 #include "../include/nlog.h"
 #include "../include/iocp.hpp"
+#include "../include/helper.hpp"
 
 namespace nlog{
 
@@ -179,7 +180,7 @@ CLog::InitLog()
     bool bFileExist = false;
     do
     {
-        bFileExist = helper::FilePathIsExist(fileName, false);
+        bFileExist = helper::FilePathIsExist(fileName);
 
         helper::CreateDirRecursively(__config.logDir);
         __hFile = CreateFile( 
