@@ -17,7 +17,7 @@ inline std::wstring& StrReplace(std::wstring& target, const std::wstring& before
 {  
     std::wstring::size_type beforeLen = before.length();  
     std::wstring::size_type afterLen  = after.length();  
-    std::wstring::size_type pos       = target.find(before, pos);
+    std::wstring::size_type pos       = target.find(before, 0);
 
     while( pos != std::wstring::npos )  
     {  
@@ -26,4 +26,16 @@ inline std::wstring& StrReplace(std::wstring& target, const std::wstring& before
     }
 
     return target;
+}
+
+inline std::pair<std::wstring, std::wstring> 
+    StrRightCarveWhit(const std::wstring& target, const std::wstring& substr)
+{
+    std::wstring::size_type index;
+    if( (index = target.rfind(substr)) != std::wstring::npos )
+    {
+        return std::make_pair(target.substr(0, index), target.substr(index + 1));
+    }
+
+    return std::pair<std::wstring, std::wstring>();
 }

@@ -141,7 +141,12 @@ CLog::SetConfig( const Config& setting )
 {
     __config = setting;
     if(setting.logDir.empty())
-        __config.logDir   =  L"\\log\\";
+    {
+        wchar_t moduleName[MAX_PATH];
+        ::GetModuleFileNameW(0, moduleName, sizeof moduleName);
+
+        __config.logDir = StrRightCarveWhit(moduleName, L"\\").first +  L"\\log\\";
+    }
 
     if(setting.fileName.empty())
         __config.fileName = (LPCTSTR)CTime::GetCurrentTime().Format(L"log-%m%d-%H%M.log");
@@ -345,8 +350,7 @@ id(CLogHelper& slef)
 CLogHelper::CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid /*= ""*/) 
     : __sessionId(guid)
 {
-    const char* fname = strrchr(file, '\\');
-    __logInfo.file    = Conver::Str2WStr(fname ? fname + 1 : file);
+    __logInfo.file    = StrRightCarveWhit(Conver::Str2WStr(file), L"\\").first;
     __logInfo.level   = level;
     __logInfo.line    = line;
 }
@@ -354,6 +358,11 @@ CLogHelper::CLogHelper(LogLevel level, const char* file, const uint32_t line, co
 CLogHelper::~CLogHelper()
 {
     CLog::Instance(__sessionId).FormatWriteLog(__strbuf.str(), __logInfo);
+}
+
+CLogHelper& CLogHelper::Format()
+{
+    return *this;
 }
 
 CLogHelper& CLogHelper::Format(const wchar_t * _Format, ...)
@@ -369,14 +378,28 @@ CLogHelper& CLogHelper::Format(const wchar_t * _Format, ...)
     return *this;
 }
 
-CLogHelper& CLogHelper::Format()
+CLogHelper& CLogHelper::Format(const char * _Format, ...)
 {
+    va_list  marker = nullptr;  
+    va_start(marker, _Format);
+
+    std::string text(_vscprintf(_Format, marker) + 1, 0);
+    vsprintf_s(&text[0], text.capacity(), _Format, marker);
+    va_end(marker);
+
+    __strbuf << Conver::Str2WStr(text.data());
     return *this;
 }
 
 CLogHelper& CLogHelper::operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &))
 {
     return ((*pfn)(*this));
+}
+
+CLogHelper& CLogHelper::operator<<(const std::string& info)
+{
+    __strbuf << Conver::Str2WStr(info);
+    return *this;
 }
 
 }// namespace nlog

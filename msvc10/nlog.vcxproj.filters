@@ -19,13 +19,7 @@
     <ClInclude Include="..\include\nlog.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\helper.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\iocp.hpp">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\config.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="..\src\string_util.hpp">

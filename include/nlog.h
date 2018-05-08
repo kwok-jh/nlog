@@ -3,7 +3,7 @@
 /*
     * nlog
     * 创建:  2016-6-16
-    * 修改:  2018-3-15
+    * 修改:  2018-5-8
     * Email：<kwok-jh@qq.com>
     * Git:   https://gitee.com/skygarth/nlog
 	
@@ -12,19 +12,11 @@
     * LOG_ERR("Hello, %s", "nlog") << " 现在时间:" << nlog::time;
 */
 
-//#include "simplelock.hpp"
-//#include "strconvert.hpp"
-
-
-#ifndef _WINDOWS_
-#error "仅支持Windows平台"
-#endif
-
 #include <map>
 #include <sstream>
 #include <stdint.h>
+#include <windows.h>
 
-//iocp.h
 class CIOCP;
 class SimpleLock;
 
@@ -77,9 +69,9 @@ protected:
         uint32_t line;
         std::wstring  file;
     };
-    std::wstring Format(const std::wstring& text, const LogInfomation& info = LogInfomation());
+    std::wstring Format (const std::wstring& text, const LogInfomation& info = LogInfomation());
     CLog& FormatWriteLog(const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
-    CLog& WriteLog(const std::wstring& strBuf);
+    CLog& WriteLog      (const std::wstring& strBuf);
 private:
     CIOCP*   __pIocp; 
     HANDLE   __hFile;
@@ -87,7 +79,7 @@ private:
     bool     __bAlreadyInit;
     LogLevel __filterLevel;
 
-    volatile uint32_t __count;
+    uint32_t __count;
     LARGE_INTEGER __liNextOffset;
 };
 
@@ -97,26 +89,30 @@ class CLogHelper
 public:
     CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid = "");
     ~CLogHelper();
+
     CLogHelper& Format();
     CLogHelper& Format(const wchar_t * _Format, ...);
+    CLogHelper& Format(const char    * _Format, ...);
 
     template<class T> 
-    CLogHelper& operator<<(T info)
-    {
-        __strbuf << info;
-        return *this;
-    }
-
-    CLogHelper& operator<<( CLogHelper&(__cdecl* pfn)(CLogHelper &) );
+    CLogHelper& operator<<(T info);
+    CLogHelper& operator<<(const std::string& info);
+    CLogHelper& operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &));
 
     friend CLogHelper& time(CLogHelper& slef);
     friend CLogHelper& id  (CLogHelper& slef);
 
 protected:
     std::string __sessionId;
-    std::wstringstream __strbuf;
+    std::wstringstream  __strbuf;
     CLog::LogInfomation __logInfo;
 };
+
+template<class T> 
+CLogHelper& CLogHelper::operator<<(T info){
+    __strbuf << info;
+    return *this;
+}
 
 }// namespace nlog
 
