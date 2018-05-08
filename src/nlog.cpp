@@ -1,13 +1,19 @@
+#include <windows.h>
+#include <atltime.h>
+
 #include "../include/nlog.h"
 #include "../include/iocp.hpp"
-#include "../include/helper.hpp"
+
+#include "string_util.hpp"
+#include "simple_lock.hpp"
+#include "string_conversions.hpp"
 
 namespace nlog{
 
 //继承重叠机构的IO结构，用于投递异步写入重叠操作
 class CLogIO : public OVERLAPPED
 {
-    tstring  __strBuf;
+    std::wstring  __strBuf;
 
 public:
     CLogIO()
@@ -15,7 +21,7 @@ public:
         Init();
     }
 
-    CLogIO(const tstring& strBuf, const LARGE_INTEGER& offset)
+    CLogIO(const std::wstring& strBuf, const LARGE_INTEGER& offset)
     {
         Init();
 
@@ -26,10 +32,10 @@ public:
 
     size_t Size() const
     {
-        return __strBuf.length() * sizeof(tstring::value_type);
+        return __strBuf.length() * sizeof(std::wstring::value_type);
     }
 
-    const TCHAR* szBuf()
+    const wchar_t* szBuf()
     {
         return __strBuf.c_str();
     }
@@ -44,12 +50,12 @@ private:
 //////////////////////////////////////////////////////////////////////////
 //CLog static function
 std::map<std::string, CLog*> CLog::__sMapInstance;
-CSimpleLock                  CLog::__mapCsec;
+std::auto_ptr<SimpleLock>    CLog::__mapLock = std::auto_ptr<SimpleLock>(new SimpleLock);
 
 CLog& 
 CLog::Instance( std::string guid /*= ""*/ )
 {
-    CAutolock lock(&__mapCsec);
+    AutoLock lock(*__mapLock);
 
     std::map<std::string, CLog*>::iterator i = __sMapInstance.find(guid);
     if(i == __sMapInstance.end())
@@ -65,7 +71,7 @@ CLog::Release( std::string guid /*= ""*/ )
 {
     CLog* _this = 0;
     {
-        CAutolock lock(&__mapCsec);
+        AutoLock lock(*__mapLock);
 
         std::map<std::string, CLog*>::iterator i = __sMapInstance.find(guid);
         if(i == __sMapInstance.end())
@@ -95,7 +101,7 @@ CLog::Release( std::string guid /*= ""*/ )
 bool 
 CLog::ReleaseAll()
 {
-    CAutolock lock(&__mapCsec);
+    AutoLock lock(*__mapLock);
 
     std::map<std::string, CLog*>::iterator i = __sMapInstance.begin();
     while(i != __sMapInstance.end())
@@ -135,17 +141,17 @@ CLog::SetConfig( const Config& setting )
 {
     __config = setting;
     if(setting.logDir.empty())
-        __config.logDir = helper::GetModulePath() + _T("\\log\\");
+        __config.logDir   =  L"\\log\\";
 
     if(setting.fileName.empty())
-        __config.fileName = helper::GetDateTime(_T("log-%m%d-%H%M.log"));
+        __config.fileName = (LPCTSTR)CTime::GetCurrentTime().Format(L"log-%m%d-%H%M.log");
 
     if(setting.dateFormat.empty())
-        __config.dateFormat = _T("%m-%d %H:%M:%S");
+        __config.dateFormat = L"%m-%d %H:%M:%S";
 
     if(setting.prefixion.empty())
         /*[{time}] [{id}] [{level}] [{file}:{line}]*/
-        __config.prefixion = _T("[{time}][{level}][{id}]: ");
+        __config.prefixion = L"[{time}][{level}][{id}]: ";
 
     return true;
 }
@@ -168,7 +174,7 @@ CLog::SetLevel( LogLevel level )
 bool 
 CLog::InitLog()
 {
-    CAutolock lock(&__mapCsec);
+    AutoLock lock(*__mapLock);
 
     if(__bAlreadyInit)
     {
@@ -176,14 +182,16 @@ CLog::InitLog()
     }
     
     //////////////////////////////////////////////////////////////////////////
-    tstring fileName   = __config.logDir + _T("\\") + Format(__config.fileName);
+    std::wstring fileName   = __config.logDir + _T("\\") + Format(__config.fileName);
     bool bFileExist = false;
     do
     {
-        bFileExist = helper::FilePathIsExist(fileName);
+        bFileExist = (::GetFileAttributesW(fileName.c_str()) != INVALID_FILE_ATTRIBUTES);
 
-        helper::CreateDirRecursively(__config.logDir);
-        __hFile = CreateFile( 
+        if(!bFileExist)
+            ::CreateDirectoryW(__config.logDir.c_str(), 0);
+
+        __hFile = ::CreateFileW( 
             fileName.c_str(),
             GENERIC_WRITE,
             FILE_SHARE_READ,     //共享读取
@@ -194,7 +202,7 @@ CLog::InitLog()
 
         if(__hFile == INVALID_HANDLE_VALUE)
         {
-            fileName.insert(fileName.rfind(_T(".")), _T("_1"));
+            fileName.insert(fileName.rfind(L"."), L"_1");
         }
 
     }while( __hFile == INVALID_HANDLE_VALUE );
@@ -206,7 +214,7 @@ CLog::InitLog()
     {
 #ifdef UNICODE
         /*如果是Unicode则写入BOM, 文件头LE:0xfffe BE:0xfeff*/
-        WriteLog(tstring(1, 0xfeff));
+        WriteLog(std::wstring(1, 0xfeff));
 #endif
     }
 
@@ -247,14 +255,14 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
     return true;
 }
 
-tstring 
-CLog::Format( const tstring& text, const LogInfomation& info /*= Loginfomation()*/ )
+std::wstring 
+CLog::Format( const std::wstring& text, const LogInfomation& info )
 {
-    tstring result  = text;
-    tstring strTime = helper::GetDateTime(__config.dateFormat);
-    tstring strId   = helper::StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
-    tstring strLine = helper::StrFormat(_T("%- 4d"), info.line);
-    tstring strLevel;
+    std::wstring result  = text;
+    std::wstring strTime = (LPCTSTR)CTime::GetCurrentTime().Format(__config.dateFormat.c_str());
+    std::wstring strId   = StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
+    std::wstring strLine = StrFormat(_T("%- 4d"), info.line);
+    std::wstring strLevel;
 
     switch(info.level)
     {
@@ -264,17 +272,17 @@ CLog::Format( const tstring& text, const LogInfomation& info /*= Loginfomation()
     case LV_PRO: strLevel = _T("PRO"); break;
     }
     
-    result = helper::StrReplace(result, _T("{level}"),strLevel);
-    result = helper::StrReplace(result, _T("{time}"), strTime);
-    result = helper::StrReplace(result, _T("{id}"),   strId);
-    result = helper::StrReplace(result, _T("{file}"), info.file);
-    result = helper::StrReplace(result, _T("{line}"), strLine);
+    result = StrReplace(result, _T("{level}"),strLevel);
+    result = StrReplace(result, _T("{time}"), strTime);
+    result = StrReplace(result, _T("{id}"),   strId);
+    result = StrReplace(result, _T("{file}"), info.file);
+    result = StrReplace(result, _T("{line}"), strLine);
     
     return result;
 }
 
 CLog& 
-CLog::FormatWriteLog( const tstring& strBuf, const LogInfomation& info /*= Loginfomation()*/ )
+CLog::FormatWriteLog( const std::wstring& strBuf, const LogInfomation& info /*= Loginfomation()*/ )
 {
     if(__filterLevel >= info.level)
     {
@@ -283,20 +291,20 @@ CLog::FormatWriteLog( const tstring& strBuf, const LogInfomation& info /*= Login
             InitLog();
         }
 
-        return WriteLog(Format(__config.prefixion, info) + strBuf + _T("\r\n"));
+        return WriteLog(Format(__config.prefixion, info) + strBuf + L"\r\n");
     }
     else
         return *this;
 }
 
 CLog& 
-CLog::WriteLog( const tstring& strBuf )
+CLog::WriteLog( const std::wstring& strBuf )
 {
     CompleteHandle();
 
     CLogIO* pIo = NULL;
     {
-        CAutolock lock(&__mapCsec);
+        AutoLock lock(*__mapLock);
         pIo = new CLogIO(strBuf, __liNextOffset);
         ::InterlockedExchangeAdd64(&__liNextOffset.QuadPart, pIo->Size());
     }
@@ -322,16 +330,53 @@ CLog::WriteLog( const tstring& strBuf )
 CLogHelper& 
 time(CLogHelper& slef)
 {
-    slef.__strbuf << helper::GetDateTime(
-        CLog::Instance(slef.__sessionId).__config.dateFormat);
+    slef.__strbuf << (LPCTSTR)CTime::GetCurrentTime().Format(
+        CLog::Instance(slef.__sessionId).__config.dateFormat.c_str());
     return slef;
 }
 
 CLogHelper& 
 id(CLogHelper& slef)
 {
-    slef.__strbuf << helper::StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
+    slef.__strbuf << StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
     return slef;
+}
+
+CLogHelper::CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid /*= ""*/) 
+    : __sessionId(guid)
+{
+    const char* fname = strrchr(file, '\\');
+    __logInfo.file    = Conver::Str2WStr(fname ? fname + 1 : file);
+    __logInfo.level   = level;
+    __logInfo.line    = line;
+}
+
+CLogHelper::~CLogHelper()
+{
+    CLog::Instance(__sessionId).FormatWriteLog(__strbuf.str(), __logInfo);
+}
+
+CLogHelper& CLogHelper::Format(const wchar_t * _Format, ...)
+{
+    va_list  marker = nullptr;  
+    va_start(marker, _Format);
+
+    std::wstring text(_vscwprintf(_Format, marker) + 1, 0);
+    vswprintf_s(&text[0], text.capacity(), _Format, marker);
+    va_end(marker);
+
+    __strbuf << text.data();
+    return *this;
+}
+
+CLogHelper& CLogHelper::Format()
+{
+    return *this;
+}
+
+CLogHelper& CLogHelper::operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &))
+{
+    return ((*pfn)(*this));
 }
 
 }// namespace nlog

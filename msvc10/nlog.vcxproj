@@ -51,7 +51,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>$(ProjectDir)copy.bat</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -66,7 +67,8 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PostBuildEvent>
-      <Command>$(ProjectDir)copy.bat</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -74,11 +76,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\config.h" />
-    <ClInclude Include="..\include\simplelock.hpp" />
     <ClInclude Include="..\include\helper.hpp" />
     <ClInclude Include="..\include\iocp.hpp" />
     <ClInclude Include="..\include\nlog.h" />
-    <ClInclude Include="..\include\strconvert.hpp" />
+    <ClInclude Include="..\src\simple_lock.hpp" />
+    <ClInclude Include="..\src\string_util.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="copy.bat" />

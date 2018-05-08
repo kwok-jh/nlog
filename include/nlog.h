@@ -12,19 +12,21 @@
     * LOG_ERR("Hello, %s", "nlog") << " 现在时间:" << nlog::time;
 */
 
-#include "config.h"
-#include "simplelock.hpp"
-#include "strconvert.hpp"
+//#include "simplelock.hpp"
+//#include "strconvert.hpp"
+
 
 #ifndef _WINDOWS_
 #error "仅支持Windows平台"
 #endif
 
 #include <map>
-
+#include <sstream>
+#include <stdint.h>
 
 //iocp.h
 class CIOCP;
+class SimpleLock;
 
 namespace nlog{
 
@@ -38,10 +40,10 @@ enum LogLevel
 
 struct Config 
 {
-    tstring logDir;
-    tstring fileName;
-    tstring dateFormat;
-    tstring prefixion;
+    std::wstring logDir;
+    std::wstring fileName;
+    std::wstring dateFormat;
+    std::wstring prefixion;
 };
 
 class CLog
@@ -56,7 +58,7 @@ class CLog
     friend CLogHelper& time(CLogHelper& slef);
 
     static std::map<std::string, CLog*> __sMapInstance;
-    static CSimpleLock                  __mapCsec;
+    static std::auto_ptr<SimpleLock>    __mapLock;
 public:
     static CLog& Instance(std::string guid = "");
     static bool  Release (std::string guid = "");
@@ -72,12 +74,12 @@ protected:
     struct  LogInfomation
     {
         LogLevel level;
-        tstring  file;
         uint32_t line;
+        std::wstring  file;
     };
-    tstring Format(const tstring& text, const LogInfomation& info = LogInfomation());
-    CLog&   FormatWriteLog(const tstring& strBuf, const LogInfomation& info = LogInfomation());
-    CLog&   WriteLog(const tstring& strBuf);
+    std::wstring Format(const std::wstring& text, const LogInfomation& info = LogInfomation());
+    CLog& FormatWriteLog(const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
+    CLog& WriteLog(const std::wstring& strBuf);
 private:
     CIOCP*   __pIocp; 
     HANDLE   __hFile;
@@ -93,37 +95,10 @@ private:
 class CLogHelper
 {
 public:
-    CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid = "")
-        : __sessionId(guid)
-    {
-        const char* fname = strrchr(file, '\\');
-        __logInfo.file    = totstr(fname ? fname + 1 : file);
-        __logInfo.level   = level;
-        __logInfo.line    = line;
-    }
-
-    ~CLogHelper()
-    {
-        CLog::Instance(__sessionId).FormatWriteLog(__strbuf.str(), __logInfo);
-    }
-
-    CLogHelper& Format()
-    {
-        return *this;
-    }
-
-    CLogHelper& Format(const TCHAR * _Format, ...) 
-    {
-        va_list  marker = nullptr;  
-        va_start(marker, _Format);
-
-        tstring text(_vsctprintf(_Format, marker) + 1, 0);
-        _vstprintf_s(&text[0], text.capacity(), _Format, marker);
-        va_end(marker);
-
-        __strbuf << text.data();
-        return *this;
-    }
+    CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid = "");
+    ~CLogHelper();
+    CLogHelper& Format();
+    CLogHelper& Format(const wchar_t * _Format, ...);
 
     template<class T> 
     CLogHelper& operator<<(T info)
@@ -132,17 +107,14 @@ public:
         return *this;
     }
 
-    CLogHelper& operator<<( CLogHelper&(__cdecl* pfn)(CLogHelper &) )
-    {
-        return ((*pfn)(*this));
-    }
+    CLogHelper& operator<<( CLogHelper&(__cdecl* pfn)(CLogHelper &) );
 
     friend CLogHelper& time(CLogHelper& slef);
     friend CLogHelper& id  (CLogHelper& slef);
 
 protected:
-    tsstream __strbuf;
     std::string __sessionId;
+    std::wstringstream __strbuf;
     CLog::LogInfomation __logInfo;
 };
 
