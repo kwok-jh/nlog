@@ -1,5 +1,12 @@
-#pragma once
+#ifndef simple_lock_h__
+#define simple_lock_h__
 
+/*
+*   应用于Windows平台的简单互斥锁
+*   2018-6 By qiling
+*/
+
+#define  WIN32_LEAN_AND_MEAN 
 #include <windows.h>
 
 class SimpleLock  
@@ -61,3 +68,5 @@ public:
         __pLock.Unlock();  
     }  
 };
+
+#endif // simple_lock_h__

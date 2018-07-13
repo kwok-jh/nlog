@@ -1,4 +1,6 @@
-#pragma once
+#ifndef string_util_h__
+#define string_util_h__
+
 
 inline std::wstring StrFormat(const wchar_t * format, ...) 
 {  
@@ -39,3 +41,5 @@ inline std::pair<std::wstring, std::wstring>
 
     return std::pair<std::wstring, std::wstring>();
 }
+
+#endif // string_util_h__

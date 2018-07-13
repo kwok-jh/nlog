@@ -1,19 +1,12 @@
-#pragma once
+#ifndef iocp_h__
+#define iocp_h__
 
+#define  WIN32_LEAN_AND_MEAN 
 #include <windows.h>
 
-/*    
-HANDLE WINAPI CreateIoCompletionPort(
-    _In_     HANDLE    FileHandle,
-    _In_opt_ HANDLE    ExistingCompletionPort,        
-    _In_     ULONG_PTR CompletionKey,                
-    _In_     DWORD     NumberOfConcurrentThreads    
-    );
-*/
-
 /*
-    完成端口的简单封装 
-    2016-6-16 By GuoJH
+*    完成端口的简单封装 
+*    2016-6 By qiling
 */
 class CIOCP 
 {
@@ -44,7 +37,7 @@ public:
 
     bool Create(int nMaxConcurrency = 0) 
     {
-        m_hIOCP = ::CreateIoCompletionPort( INVALID_HANDLE_VALUE, NULL, 0, nMaxConcurrency);
+        m_hIOCP = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, nMaxConcurrency);
         return m_hIOCP != NULL;
     }
 
@@ -58,15 +51,11 @@ public:
         return AssociateDevice((HANDLE) hSocket, CompKey);
     }
 
-    //向完成端口投放一个状态，GetStatus可以获取该状态
     bool PostStatus(ULONG_PTR CompKey, DWORD dwNumBytes = 0,  OVERLAPPED* po = NULL) 
     {
-        //dwNumBytes 操作完成转移的字节数
-        //po重叠结构的指针
         return !!::PostQueuedCompletionStatus(m_hIOCP, dwNumBytes, CompKey, po);
     }
 
-    //监听完成端口的状态
     bool GetStatus(LPDWORD pdwNumBytes, ULONG_PTR* pCompKey, LPOVERLAPPED* ppo, DWORD dwMilliseconds = INFINITE) 
     {
         //_in    pCompKey        与设备关联时设置的指针
@@ -81,3 +70,5 @@ public:
 private:
     HANDLE m_hIOCP;
 };
+
+#endif // iocp_h__

@@ -1,6 +1,5 @@
-#include <windows.h>
-#include <atltime.h>
 
+#include <atltime.h>
 #include "../include/nlog.h"
 #include "../include/iocp.hpp"
 
