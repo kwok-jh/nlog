@@ -14,7 +14,7 @@
     * Example:
     * #include "nlog.h"                                             //包含头文件, 并连接对应的lib
     * ...
-    * LOG_ERR("Hello, %s", "nlog") << " Not Time:" << nlog::time;   //c,c++风格混搭格式化输出
+    * LOG_ERR("Hello, %s", "nlog") << " Now Time:" << nlog::time;   //c,c++风格混搭格式化输出
     * ...
     * LOG_CLOSE();                                                  //最后执行清理
 */
