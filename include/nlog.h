@@ -14,17 +14,31 @@
     * Example:
     * #include "nlog.h"                                             //包含头文件, 并连接对应的lib
     * ...
-    * LOG_ERR("Hello, %s", "nlog") << " Now Time:" << nlog::time;   //c,c++风格混搭格式化输出
+    * _NLOG_ERR("Hello, %s", "nlog") << " Now Time:" << nlog::time; //c,c++风格混搭格式化输出
     * ...
-    * LOG_CLOSE();                                                  //最后执行清理
+    * _NLOG_SHUTDOWN();                                             //最后执行清理
 */
 
 #include <map>
 #include <sstream>
-#include <stdint.h>
 
 #define  WIN32_LEAN_AND_MEAN 
 #include <windows.h>
+
+/* export */
+#ifdef  NLOG_STATIC_LIB
+# define _EXPORT_ 
+#else
+#ifdef  NLOG_SHARE_LIB
+# define _EXPORT_ __declspec(dllexport)
+
+/* 不用导出私有成员类型 */
+#pragma warning( push )
+#pragma warning( disable : 4251 ) 
+#else
+# define _EXPORT_ __declspec(dllimport)
+#endif // NLOG_SHARE_LIB
+#endif // NLOG_STATIC_LIB
 
 class CIOCP;
 class SimpleLock;
@@ -41,13 +55,13 @@ enum LogLevel
 
 struct Config 
 {
-    std::wstring logDir;        //日志存储目录
-    std::wstring fileName;      //文件名格式
-    std::wstring dateFormat;    //日期格式
-    std::wstring prefixion;     //前缀格式
+    std::wstring logDir;        //日志存储目录    default: "%ModuleDirectory%/log/"
+    std::wstring fileName;      //文件名格式      default: "log-%m%d-%H%M.log"
+    std::wstring dateFormat;    //日期格式        default: "%m-%d %H:%M:%S"
+    std::wstring prefixion;     //前缀格式        default: "[{time}][{level}][{id}]: "
 };
 
-class CLog
+class _EXPORT_ CLog
 {
     CLog();
     ~CLog();
@@ -58,8 +72,8 @@ class CLog
     friend class CLogHelper;
     friend CLogHelper& time(CLogHelper& slef);
 
-    static std::map<std::string, CLog*> __sMapInstance;
-    static std::auto_ptr<SimpleLock>    __mapLock;
+    static std::map<std::string, CLog*>  __sMapInstance;
+    static std::auto_ptr<SimpleLock>     __mapLock;
 public:
     /*
     *   获得一个Log的实例, 允许存在多个Log实例, guid代表实例的唯一Id
@@ -86,7 +100,7 @@ protected:
     struct  LogInfomation
     {
         LogLevel level;
-        uint32_t line;
+        unsigned int line;
         std::wstring  file;
     };
     std::wstring Format (const std::wstring& text, const LogInfomation& info = LogInfomation());
@@ -99,15 +113,15 @@ private:
     bool     __bAlreadyInit;
     LogLevel __filterLevel;
 
-    uint32_t __count;
+    unsigned int __count;
     LARGE_INTEGER __liNextOffset;
 };
 
 //////////////////////////////////////////////////////////////////////////
-class CLogHelper
+class _EXPORT_ CLogHelper
 {
 public:
-    CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid = "");
+    CLogHelper(LogLevel level, const char* file, const unsigned int line, const std::string& guid = "");
     ~CLogHelper();
 
     CLogHelper& Format();
@@ -122,7 +136,7 @@ public:
     friend CLogHelper& time(CLogHelper& slef);
     friend CLogHelper& id  (CLogHelper& slef);
 
-protected:
+private:
     std::string __sessionId;
     std::wstringstream  __strbuf;
     CLog::LogInfomation __logInfo;
@@ -136,19 +150,76 @@ CLogHelper& CLogHelper::operator<<(T info){
 
 }// namespace nlog
 
-//使用默认Log实例格式化输出一条信息
-#define LOG_ERR  nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__).Format
-#define LOG_WAR  nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__).Format
-#define LOG_APP  nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__).Format
-#define LOG_PRO  nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__).Format
+#ifdef NLOG_SHARE_LIB
+#pragma warning( pop )
+#endif
 
-//使用指定的Log实例格式化输出一条信息
-#define LOG_ERR_WITH_ID(id) nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, id).Format
-#define LOG_WAR_WITH_ID(id) nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, id).Format
-#define LOG_APP_WITH_ID(id) nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__, id).Format
-#define LOG_PRO_WITH_ID(id) nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__, id).Format
+/*
+*	使用默认Log实例, 格式化输出一条信息
+*   example:
+*   LOG_ERR("hello") << "nlog";
+*/
+#define _NLOG_ERR  nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__).Format
+#define _NLOG_WAR  nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__).Format
+#define _NLOG_APP  nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__).Format
+#define _NLOG_PRO  nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__).Format
 
-//执行清理工作
-#define LOG_CLOSE nlog::CLog::ReleaseAll
+/*
+*	使用指定的Log实例, 格式化输出一条信息
+*   example:
+*   #define LOG_UID    "device_support"
+*   #define LOG_ERR    _NLOG_ERR_WITH_ID(LOG_UID)   
+*   ...
+*   LOG_ERR("hello") << "nlog";     
+*/
+#define _NLOG_ERR_WITH_ID(id) nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, id).Format
+#define _NLOG_WAR_WITH_ID(id) nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, id).Format
+#define _NLOG_APP_WITH_ID(id) nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__, id).Format
+#define _NLOG_PRO_WITH_ID(id) nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__, id).Format
+
+/*
+*   设置初始配置
+*   example:
+*      
+*   _NLOG_CFG cfg = {
+*       L"",
+*       L"ios device support %m%d %H%M.log",
+*       L"",
+*       L"[{time}][{level}][{id}][{file}:{line}]: "
+*   };
+*
+*   _NLOG_SET_CONFIG(cfg);
+*/
+
+#define _NLOG_CFG                            nlog::Config
+#define _NLOG_SET_CONFIG(cfg)                nlog::CLog::Instance().SetConfig(cfg)
+#define _NLOG_SET_CONFIG_WITH_ID(id, cfg)    nlog::CLog::Instance(id).SetConfig(cfg)
+
+/*
+*	执行清理工作, 销毁所有存在的nlog实例
+*   example: - 初始配置与自动销毁
+*
+*   struct _NLogMgr 
+*   {
+*        _NLogMgr() 
+*        {
+*            _NLOG_CFG cfg = {
+*                L"",
+*                L"device support-%m%d %H%M.log",
+*                L"",
+*                L"[{time}][{level}][{id}][{file}:{line}]: "
+*            };
+*    
+*            _NLOG_SET_CONFIG(cfg);
+*        }
+*    
+*        ~_NLogMgr() {
+*            _NLOG_SHUTDOWN();
+*        }
+*    };
+*
+*    static _NLogMgr _NLog;
+*/
+#define _NLOG_SHUTDOWN  nlog::CLog::ReleaseAll
 
 #endif // nlog_h__

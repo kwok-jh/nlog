@@ -241,7 +241,7 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
 
         if( pIo != NULL ) 
         { 
-            ::InterlockedDecrement(&__count);
+            ::InterlockedDecrement((LONG*)&__count);
 
             delete pIo; 
             pIo = NULL; 
@@ -315,7 +315,7 @@ CLog::WriteLog( const std::wstring& strBuf )
 
     //Í¶µÝÖØµþIO
     ::WriteFile( __hFile, pIo->szBuf(), pIo->Size(), NULL, pIo );
-    ::InterlockedIncrement(&__count);
+    ::InterlockedIncrement((LONG*)&__count);
 
     if(GetLastError() == ERROR_IO_PENDING)
     {
@@ -346,7 +346,7 @@ id(CLogHelper& slef)
     return slef;
 }
 
-CLogHelper::CLogHelper(LogLevel level, const char* file, const uint32_t line, const std::string& guid /*= ""*/) 
+CLogHelper::CLogHelper(LogLevel level, const char* file, const unsigned int line, const std::string& guid /*= ""*/) 
     : __sessionId(guid)
 {
     __logInfo.file    = StrRightCarveWhit(Conver::Str2WStr(file), L"\\").first;
@@ -366,7 +366,7 @@ CLogHelper& CLogHelper::Format()
 
 CLogHelper& CLogHelper::Format(const wchar_t * _Format, ...)
 {
-    va_list  marker = nullptr;  
+    va_list  marker = NULL;  
     va_start(marker, _Format);
 
     std::wstring text(_vscwprintf(_Format, marker) + 1, 0);
@@ -379,7 +379,7 @@ CLogHelper& CLogHelper::Format(const wchar_t * _Format, ...)
 
 CLogHelper& CLogHelper::Format(const char * _Format, ...)
 {
-    va_list  marker = nullptr;  
+    va_list  marker = NULL;  
     va_start(marker, _Format);
 
     std::string text(_vscprintf(_Format, marker) + 1, 0);
