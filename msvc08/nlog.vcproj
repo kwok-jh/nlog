@@ -59,6 +59,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\$(ProjectName)d.dll"
+				GenerateDebugInformation="true"
 				ImportLibrary="$(SolutionDir)bin/lib/$(TargetName).lib"
 			/>
 			<Tool

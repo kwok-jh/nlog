@@ -262,7 +262,7 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
 std::wstring 
 CLog::Format( const std::wstring& text, const LogInfomation& info )
 {
-    std::wstring result  = text;
+    std::wstring result  = (LPCTSTR)CTime::GetCurrentTime().Format(text.c_str());
     std::wstring strTime = (LPCTSTR)CTime::GetCurrentTime().Format(__config.dateFormat.c_str());
     std::wstring strId   = StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
     std::wstring strLine = StrFormat(_T("%- 4d"), info.line);

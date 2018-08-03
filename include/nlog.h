@@ -29,12 +29,12 @@
 #ifdef  NLOG_STATIC_LIB
 # define _EXPORT_ 
 #else
-#ifdef  NLOG_SHARE_LIB
-# define _EXPORT_ __declspec(dllexport)
 
-/* 不用导出私有成员类型 */
 #pragma warning( push )
 #pragma warning( disable : 4251 ) 
+
+#ifdef  NLOG_SHARE_LIB
+# define _EXPORT_ __declspec(dllexport)
 #else
 # define _EXPORT_ __declspec(dllimport)
 #endif // NLOG_SHARE_LIB
@@ -55,7 +55,7 @@ enum LogLevel
 
 struct Config 
 {
-    std::wstring logDir;        //日志存储目录    default: "%ModuleDirectory%/log/"
+    std::wstring logDir;        //日志存储目录    default: "/log/"
     std::wstring fileName;      //文件名格式      default: "log-%m%d-%H%M.log"
     std::wstring dateFormat;    //日期格式        default: "%m-%d %H:%M:%S"
     std::wstring prefixion;     //前缀格式        default: "[{time}][{level}][{id}]: "
@@ -70,7 +70,7 @@ class _EXPORT_ CLog
     CLog operator=(const CLog&);
 
     friend class CLogHelper;
-    friend CLogHelper& time(CLogHelper& slef);
+    friend _EXPORT_ CLogHelper& time(CLogHelper& slef);
 
     static std::map<std::string, CLog*>  __sMapInstance;
     static std::auto_ptr<SimpleLock>     __mapLock;
@@ -133,8 +133,8 @@ public:
     CLogHelper& operator<<(const std::string& info);
     CLogHelper& operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &));
 
-    friend CLogHelper& time(CLogHelper& slef);
-    friend CLogHelper& id  (CLogHelper& slef);
+    friend _EXPORT_ CLogHelper& time(CLogHelper& slef);
+    friend _EXPORT_ CLogHelper& id  (CLogHelper& slef);
 
 private:
     std::string __sessionId;
@@ -148,16 +148,19 @@ CLogHelper& CLogHelper::operator<<(T info){
     return *this;
 }
 
+_EXPORT_ CLogHelper& time(CLogHelper& slef);
+_EXPORT_ CLogHelper& id  (CLogHelper& slef);
+
 }// namespace nlog
 
-#ifdef NLOG_SHARE_LIB
+#ifndef  NLOG_STATIC_LIB
 #pragma warning( pop )
 #endif
 
 /*
 *	使用默认Log实例, 格式化输出一条信息
 *   example:
-*   LOG_ERR("hello") << "nlog";
+*   _NLOG_ERR("hello") << "nlog";
 */
 #define _NLOG_ERR  nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__).Format
 #define _NLOG_WAR  nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__).Format
@@ -170,7 +173,7 @@ CLogHelper& CLogHelper::operator<<(T info){
 *   #define LOG_UID    "device_support"
 *   #define LOG_ERR    _NLOG_ERR_WITH_ID(LOG_UID)   
 *   ...
-*   LOG_ERR("hello") << "nlog";     
+*   _NLOG_ERR("hello") << "nlog";     
 */
 #define _NLOG_ERR_WITH_ID(id) nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, id).Format
 #define _NLOG_WAR_WITH_ID(id) nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, id).Format
@@ -205,7 +208,7 @@ CLogHelper& CLogHelper::operator<<(T info){
 *        {
 *            _NLOG_CFG cfg = {
 *                L"",
-*                L"device support-%m%d %H%M.log",
+*                L"nlog-%m%d%H%M.log",
 *                L"",
 *                L"[{time}][{level}][{id}][{file}:{line}]: "
 *            };
