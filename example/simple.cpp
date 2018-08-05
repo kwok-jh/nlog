@@ -12,13 +12,13 @@
 
 int main()
 {
-    _NLOG_APP("Hello %s!", "World");                                        //打印C风格    多字节
+    _NLOG_APP("Hello %s!", "World");                                       //打印C风格    多字节
 
-    _NLOG_WAR() << nlog::time   << L" 从此刻起我们的征途便是星辰大海...";   //打印C++风格  宽字节
+    _NLOG_WAR() << nlog::time  << L" 此后起我们的征程便是星辰大海...";     //打印C++风格  宽字节
 
-    _NLOG_ERR("Oh, %s! ", "No") << L"有人动了你的代码并在里面下了毒...";    //混搭式打印
+    _NLOG_ERR("Oh, %s!", "No") << L" 有人动了你的代码并在里面下了毒...";   //混搭式打印
     
-    _NLOG_SHUTDOWN();                                                       //关闭nlog, 清理资源
+    _NLOG_SHUTDOWN();                                                      //关闭nlog, 清理资源
 
     return 0;
 }

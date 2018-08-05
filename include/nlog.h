@@ -2,21 +2,21 @@
 #define nlog_h__
 
 /*
-    * nlog
-    * 创建:  2016-6-16
-    * 修改:  2018-5-8
-    * Email：<kwok-jh@qq.com>
-    * Git:   https://gitee.com/skygarth/nlog
-	
-	* 异步
-    * 多线程安全
-    
-    * Example:
-    * #include "nlog.h"                                             //包含头文件, 并连接对应的lib
-    * ...
-    * _NLOG_ERR("Hello, %s", "nlog") << " Now Time:" << nlog::time; //c,c++风格混搭格式化输出
-    * ...
-    * _NLOG_SHUTDOWN();                                             //最后执行清理
+*    nlog
+*    创建:  2016-6-16
+*    修改:  2018-8-5
+*    Email：<kwok-jh@qq.com>
+*    Git:   https://gitee.com/skygarth/nlog
+
+*    异步
+*    多线程安全
+
+*    Example:
+*    #include "nlog.h"                                             //包含头文件, 并连接对应的lib
+*    ...
+*    _NLOG_ERR("Hello, %s", "nlog") << " Now Time:" << nlog::time; //c,c++风格混搭格式化输出
+*    ...
+*    _NLOG_SHUTDOWN();                                             //最后执行清理
 */
 
 #include <map>
@@ -41,10 +41,13 @@
 #endif // NLOG_STATIC_LIB
 
 class CIOCP;
-class SimpleLock;
+class CSimpleLock;
 
 namespace nlog{
 
+/*
+*	日志等级
+*/
 enum LogLevel
 {
     LV_ERR = 0,
@@ -53,14 +56,50 @@ enum LogLevel
     LV_PRO = 3
 };
 
+/*
+*   日志配置数据结构
+*/
 struct Config 
 {
-    std::wstring logDir;        //日志存储目录    default: "/log/"
-    std::wstring fileName;      //文件名格式      default: "log-%m%d-%H%M.log"
-    std::wstring dateFormat;    //日期格式        default: "%m-%d %H:%M:%S"
-    std::wstring prefixion;     //前缀格式        default: "[{time}][{level}][{id}]: "
+    /*
+    *	日志存储目录      default: "{module_dir}\\log\\"
+    *   可选变量:
+    *   {module_dir}      当前可执行模块目录, 默认是程序的当前目录
+    *    %Y,%m,%d,%H ...  时间日期格式化
+    */
+    std::wstring logDir;
+
+    /*
+    *	文件名格式        default: "log-%m%d-%H%M.log"    如(log-0805-2348.log)
+    *   可选变量:
+    *   %Y,%m,%d,%H ...   时间日期格式化
+    */
+    std::wstring fileName;
+
+    /*
+    *	日期格式          default: "%m-%d %H:%M:%S"       如(08-05 23:48:06)
+    *   可选变量:
+    *   %Y(%y),%m,%d,%H,%M,%S 时间日期格式化 分别是 年,月,日,时,分,秒
+    */
+    std::wstring dateFormat;
+
+    /*
+    *	前缀格式          default: "[{time}][{level}][{id}]: " 
+    *                            如([08-05 23:48:06][ERR][2F84    ]: )
+    *   可选变量:
+    *   {module_dir}      当前可执行模块目录
+    *   {level}           当前打印日志的等级
+    *   {time}            当前打印日志的时间 格式由dateFormat指定
+    *   {id}              当前打印日志的线程id
+    *   {file}            当前打印日志的源文件名
+    *   {line}            当前打印日志的源文件行
+    */
+    std::wstring prefixion;
 };
 
+/*
+*   日志类
+*/
 class _EXPORT_ CLog
 {
     CLog();
@@ -72,8 +111,8 @@ class _EXPORT_ CLog
     friend class CLogHelper;
     friend _EXPORT_ CLogHelper& time(CLogHelper& slef);
 
-    static std::map<std::string, CLog*>  __sMapInstance;
-    static std::auto_ptr<SimpleLock>     __mapLock;
+    static std::map<std::string, CLog*> * __pInstances;
+    static CSimpleLock                  * _pLock;
 public:
     /*
     *   获得一个Log的实例, 允许存在多个Log实例, guid代表实例的唯一Id
@@ -117,7 +156,9 @@ private:
     LARGE_INTEGER __liNextOffset;
 };
 
-//////////////////////////////////////////////////////////////////////////
+/*
+*   日志格式化辅助类
+*/
 class _EXPORT_ CLogHelper
 {
 public:

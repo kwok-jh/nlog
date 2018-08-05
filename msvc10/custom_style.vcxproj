@@ -10,6 +10,9 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\example\custom_style.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0AE57B5B-D60D-48E5-9CE9-AEEA065A5C9F}</ProjectGuid>
     <RootNamespace>example</RootNamespace>
@@ -72,9 +75,6 @@
       <AdditionalLibraryDirectories>$(SolutionDir)bin\msvc10\lib\</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="custom_style.cpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

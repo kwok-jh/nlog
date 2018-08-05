@@ -9,18 +9,18 @@
 #define  WIN32_LEAN_AND_MEAN 
 #include <windows.h>
 
-class SimpleLock  
+class CSimpleLock  
 {  
     CRITICAL_SECTION __cs;
 public:  
-    SimpleLock()  
+    CSimpleLock()  
     {  
         // The second parameter is the spin count, for short-held locks it avoid the
         // contending thread from going to sleep which helps performance greatly.
         ::InitializeCriticalSectionAndSpinCount(&__cs, 2000);
     } 
 
-    ~SimpleLock()  
+    ~CSimpleLock()  
     {  
         ::DeleteCriticalSection(&__cs);  
     }  
@@ -49,21 +49,21 @@ public:
     }  
 };
 
-// A helper class that acquires the given Lock while the AutoLock is in scope.
-class AutoLock  
+// A helper class that acquires the given Lock while the CAutoLock is in scope.
+class CAutoLock  
 {  
-    AutoLock(const AutoLock&);
-    AutoLock& operator=(const AutoLock&);
+    CAutoLock(const CAutoLock&);
+    CAutoLock& operator=(const CAutoLock&);
 
-    SimpleLock& __pLock;
+    CSimpleLock& __pLock;
 public:  
-    explicit AutoLock(SimpleLock& pLock)
+    explicit CAutoLock(CSimpleLock& pLock)
         : __pLock(pLock)
     {   
         __pLock.Lock();
     }  
 
-    ~AutoLock()  
+    ~CAutoLock()  
     {  
         __pLock.Unlock();  
     }  

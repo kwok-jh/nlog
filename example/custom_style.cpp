@@ -21,11 +21,13 @@ struct _log_mgr
     */
     _log_mgr() 
     {
-        //这里填空的话, 代表使用默认值
+        /*
+        *	这里填空的话, 代表使用默认值
+        */
         _NLOG_CFG cfg = {
-            L"",                                        //日志存储目录    默认是: "/log/"
+            L"{module_dir}\\日志",                      //日志存储目录    默认是: "{module_dir}\\log\\"
             L"custom_style_%m%d.log",                   //文件名格式      默认是: "log-%m%d-%H%M.log"
-            L"",                                        //日期格式        默认是: "%m-%d %H:%M:%S"
+            L"%Y-%m-%d",                                //日期格式        默认是: "%m-%d %H:%M:%S"
             L"[{time}][{level}][{id}][{file}:{line}]: " //前缀格式        默认是: "[{time}][{level}][{id}]: "
         };
 
@@ -49,8 +51,6 @@ int main()
     _NLOG_WAR() << nlog::time   << L" 从此刻起我们的征途便是星辰大海...";   //打印C++风格  宽字节
 
     _NLOG_ERR("Oh, %s! ", "No") << L"有人动了你的代码并在里面下了毒...";    //混搭式打印
-
-    _NLOG_SHUTDOWN();                                                       //关闭nlog, 清理资源
 
     return 0;
 }

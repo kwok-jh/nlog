@@ -29,70 +29,89 @@ public:
         this->OffsetHigh = offset.HighPart;
     }
 
-    size_t Size() const
+    size_t Size() const 
     {
         return __strBuf.length() * sizeof(std::wstring::value_type);
     }
 
-    const wchar_t* szBuf()
+    const wchar_t* szBuf() 
     {
         return __strBuf.c_str();
     }
 private:
-    void Init()
+    void Init() 
     {
-        //初始化OVERLAPPED结构
         memset( this, 0, sizeof(OVERLAPPED) );
     }
 };
 
 //////////////////////////////////////////////////////////////////////////
 //CLog static function
-std::map<std::string, CLog*> CLog::__sMapInstance;
-std::auto_ptr<SimpleLock>    CLog::__mapLock = std::auto_ptr<SimpleLock>(new SimpleLock);
+std::map<std::string, CLog*> * CLog::__pInstances = NULL;
+CSimpleLock                  * CLog::_pLock = NULL;
 
 CLog& 
 CLog::Instance( std::string guid /*= ""*/ )
 {
-    AutoLock lock(*__mapLock);
+    /*
+    *	为了避免在静态库中使用全局变量导致到一系列问题, 这里统一使用裸指针
+    *   在需要的时候实例化
+    */
+    if(!_pLock)
+        _pLock = new CSimpleLock;
 
-    std::map<std::string, CLog*>::iterator i = __sMapInstance.find(guid);
-    if(i == __sMapInstance.end())
+    if(!__pInstances)
+        __pInstances = new std::map<std::string, CLog*>();
+
+    CAutoLock lock(*_pLock);
+
+    std::map<std::string, CLog*>::iterator i = __pInstances->find(guid);
+    if(i == __pInstances->end())
     {
-        __sMapInstance[guid] = new CLog();
+        (*__pInstances)[guid] = new CLog();
     }
 
-    return *__sMapInstance[guid];
+    return *(*__pInstances)[guid];
 }
 
 bool 
 CLog::Release( std::string guid /*= ""*/ )
 {
+    if(!_pLock || !__pInstances)
+        return false;
+
     CLog* _this = 0;
     {
-        AutoLock lock(*__mapLock);
+        CAutoLock lock(*_pLock);
 
-        std::map<std::string, CLog*>::iterator i = __sMapInstance.find(guid);
-        if(i == __sMapInstance.end())
-        {
+        std::map<std::string, CLog*>::iterator i = __pInstances->find(guid);
+        if(i == __pInstances->end()) {
             return false;
         }
 
         _this = i->second;
-        __sMapInstance.erase(i);
+        __pInstances->erase(i);
     }
 
-    //////////////////////////////////////////////////////////////////////////
-    /*关闭完成端口, 并释放完成的资源*/
-
-    if(_this->__hFile != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle(_this->__hFile);
+    /*
+    *   关闭完成端口, 并释放完成的资源	
+    */
+    if(_this->__hFile != INVALID_HANDLE_VALUE) {
+        ::CloseHandle(_this->__hFile);
         _this->__hFile = INVALID_HANDLE_VALUE;
     }
 
     _this->CompleteHandle(true);
     _this->__pIocp->Close();
+
+    /*
+    *	如果实例为空了, 那么主动销毁静态成员实例
+    */
+    if(__pInstances->empty())
+    {
+        delete _pLock; _pLock = NULL;
+        delete __pInstances; __pInstances = NULL;
+    }
     
     return true;
 }
@@ -100,14 +119,27 @@ CLog::Release( std::string guid /*= ""*/ )
 bool 
 CLog::ReleaseAll()
 {
-    AutoLock lock(*__mapLock);
+    if(!_pLock || !__pInstances)
+        return false;
 
-    std::map<std::string, CLog*>::iterator i = __sMapInstance.begin();
-    while(i != __sMapInstance.end())
+    CAutoLock lock(*_pLock);
+
+    std::map<std::string, CLog*>::iterator i = __pInstances->begin();
+    while(i != __pInstances->end())
     {
-        Release(i->first);
-        i = __sMapInstance.begin();
+        if(i->second->__hFile != INVALID_HANDLE_VALUE) {
+            ::CloseHandle(i->second->__hFile);
+            i->second->__hFile = INVALID_HANDLE_VALUE;
+        }
+
+        i->second->CompleteHandle(true);
+        i->second->__pIocp->Close();
+
+        i = __pInstances->erase(i);
     }
+
+    delete _pLock; _pLock = NULL;
+    delete __pInstances; __pInstances = NULL;
 
     return true;
 }
@@ -140,15 +172,10 @@ CLog::SetConfig( const Config& setting )
 {
     __config = setting;
     if(setting.logDir.empty())
-    {
-        wchar_t moduleName[MAX_PATH];
-        ::GetModuleFileNameW(0, moduleName, sizeof moduleName);
-
-        __config.logDir = StrRightCarveWhit(moduleName, L"\\").first +  L"\\log\\";
-    }
+        __config.logDir = L"{module_dir}\\log\\";
 
     if(setting.fileName.empty())
-        __config.fileName = (LPCTSTR)CTime::GetCurrentTime().Format(L"log-%m%d-%H%M.log");
+        __config.fileName = L"log-%m%d-%H%M.log";
 
     if(setting.dateFormat.empty())
         __config.dateFormat = L"%m-%d %H:%M:%S";
@@ -178,7 +205,7 @@ CLog::SetLevel( LogLevel level )
 bool 
 CLog::InitLog()
 {
-    AutoLock lock(*__mapLock);
+    CAutoLock lock(*_pLock);
 
     if(__bAlreadyInit)
     {
@@ -186,14 +213,14 @@ CLog::InitLog()
     }
     
     //////////////////////////////////////////////////////////////////////////
-    std::wstring fileName   = __config.logDir + _T("\\") + Format(__config.fileName);
+    std::wstring fileName = Format(__config.logDir) + _T("\\") + Format(__config.fileName);
     bool bFileExist = false;
     do
     {
         bFileExist = (::GetFileAttributesW(fileName.c_str()) != INVALID_FILE_ATTRIBUTES);
 
         if(!bFileExist)
-            ::CreateDirectoryW(__config.logDir.c_str(), 0);
+            ::CreateDirectoryW(Format(__config.logDir).c_str(), 0);
 
         __hFile = ::CreateFileW( 
             fileName.c_str(),
@@ -262,12 +289,15 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
 std::wstring 
 CLog::Format( const std::wstring& text, const LogInfomation& info )
 {
+    /*
+    *	这里的查找, 还存在大量的性能浪费, 后面可以专门做优化
+    */
     std::wstring result  = (LPCTSTR)CTime::GetCurrentTime().Format(text.c_str());
     std::wstring strTime = (LPCTSTR)CTime::GetCurrentTime().Format(__config.dateFormat.c_str());
     std::wstring strId   = StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
     std::wstring strLine = StrFormat(_T("%- 4d"), info.line);
+    
     std::wstring strLevel;
-
     switch(info.level)
     {
     case LV_ERR: strLevel = _T("ERR"); break;
@@ -275,12 +305,20 @@ CLog::Format( const std::wstring& text, const LogInfomation& info )
     case LV_APP: strLevel = _T("APP"); break;
     case LV_PRO: strLevel = _T("PRO"); break;
     }
-    
-    result = StrReplace(result, _T("{level}"),strLevel);
-    result = StrReplace(result, _T("{time}"), strTime);
-    result = StrReplace(result, _T("{id}"),   strId);
-    result = StrReplace(result, _T("{file}"), info.file);
-    result = StrReplace(result, _T("{line}"), strLine);
+
+    std::wstring strModule;
+    {
+        wchar_t buffer[MAX_PATH] = {0};
+        ::GetModuleFileNameW(0, buffer, sizeof buffer);
+        strModule = StrRightCarveWhit(buffer, L"\\").first;
+    }
+
+    result = StrReplace(result, L"{module_dir}",strModule);
+    result = StrReplace(result, L"{level}", strLevel);
+    result = StrReplace(result, L"{time}", strTime);
+    result = StrReplace(result, L"{id}", strId);
+    result = StrReplace(result, L"{file}", info.file);
+    result = StrReplace(result, L"{line}", strLine);
     
     return result;
 }
@@ -308,7 +346,7 @@ CLog::WriteLog( const std::wstring& strBuf )
 
     CLogIO* pIo = NULL;
     {
-        AutoLock lock(*__mapLock);
+        CAutoLock lock(*_pLock);
         pIo = new CLogIO(strBuf, __liNextOffset);
         ::InterlockedExchangeAdd64(&__liNextOffset.QuadPart, pIo->Size());
     }

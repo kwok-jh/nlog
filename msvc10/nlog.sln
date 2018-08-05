@@ -7,13 +7,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "example", "example", "{5D8B
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nlog", "nlog.vcxproj", "{029E0E90-8A03-47BF-B6D7-1C5680FA69FF}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple", "..\example\simple.vcxproj", "{4C9E4664-7028-489F-8D8B-3720875619AC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple", "simple.vcxproj", "{4C9E4664-7028-489F-8D8B-3720875619AC}"
 	ProjectSection(ProjectDependencies) = postProject
 		{029E0E90-8A03-47BF-B6D7-1C5680FA69FF} = {029E0E90-8A03-47BF-B6D7-1C5680FA69FF}
-		{DD8EE4AC-36CB-4D90-BF6B-E6C595CDE4A1} = {DD8EE4AC-36CB-4D90-BF6B-E6C595CDE4A1}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "custom_style", "..\example\custom_style.vcxproj", "{0AE57B5B-D60D-48E5-9CE9-AEEA065A5C9F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "custom_style", "custom_style.vcxproj", "{0AE57B5B-D60D-48E5-9CE9-AEEA065A5C9F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DD8EE4AC-36CB-4D90-BF6B-E6C595CDE4A1} = {DD8EE4AC-36CB-4D90-BF6B-E6C595CDE4A1}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
