@@ -27,16 +27,16 @@
 
 /* export */
 #ifdef  NLOG_STATIC_LIB
-# define _EXPORT_ 
+# define NLOG_LIB 
 #else
 
 #pragma warning( push )
 #pragma warning( disable : 4251 ) 
 
 #ifdef  NLOG_SHARE_LIB
-# define _EXPORT_ __declspec(dllexport)
+# define NLOG_LIB __declspec(dllexport)
 #else
-# define _EXPORT_ __declspec(dllimport)
+# define NLOG_LIB __declspec(dllimport)
 #endif // NLOG_SHARE_LIB
 #endif // NLOG_STATIC_LIB
 
@@ -100,7 +100,7 @@ struct Config
 /*
 *   日志类
 */
-class _EXPORT_ CLog
+class NLOG_LIB CLog
 {
     CLog();
     ~CLog();
@@ -109,10 +109,10 @@ class _EXPORT_ CLog
     CLog operator=(const CLog&);
 
     friend class CLogHelper;
-    friend _EXPORT_ CLogHelper& time(CLogHelper& slef);
+    friend NLOG_LIB CLogHelper& time(CLogHelper& slef);
 
     static std::map<std::string, CLog*> * __pInstances;
-    static CSimpleLock                  * _pLock;
+    static CSimpleLock                  * __pLock;
 public:
     /*
     *   获得一个Log的实例, 允许存在多个Log实例, guid代表实例的唯一Id
@@ -159,7 +159,7 @@ private:
 /*
 *   日志格式化辅助类
 */
-class _EXPORT_ CLogHelper
+class NLOG_LIB CLogHelper
 {
 public:
     CLogHelper(LogLevel level, const char* file, const unsigned int line, const std::string& guid = "");
@@ -174,8 +174,8 @@ public:
     CLogHelper& operator<<(const std::string& info);
     CLogHelper& operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &));
 
-    friend _EXPORT_ CLogHelper& time(CLogHelper& slef);
-    friend _EXPORT_ CLogHelper& id  (CLogHelper& slef);
+    friend NLOG_LIB CLogHelper& time(CLogHelper& slef);
+    friend NLOG_LIB CLogHelper& id  (CLogHelper& slef);
 
 private:
     std::string __sessionId;
@@ -189,8 +189,8 @@ CLogHelper& CLogHelper::operator<<(T info){
     return *this;
 }
 
-_EXPORT_ CLogHelper& time(CLogHelper& slef);
-_EXPORT_ CLogHelper& id  (CLogHelper& slef);
+NLOG_LIB CLogHelper& time(CLogHelper& slef);
+NLOG_LIB CLogHelper& id  (CLogHelper& slef);
 
 }// namespace nlog
 
@@ -214,7 +214,7 @@ _EXPORT_ CLogHelper& id  (CLogHelper& slef);
 *   #define LOG_UID    "device_support"
 *   #define LOG_ERR    _NLOG_ERR_WITH_ID(LOG_UID)   
 *   ...
-*   _NLOG_ERR("hello") << "nlog";     
+*   LOG_ERR("hello") << "nlog";     
 */
 #define _NLOG_ERR_WITH_ID(id) nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, id).Format
 #define _NLOG_WAR_WITH_ID(id) nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, id).Format
@@ -227,7 +227,7 @@ _EXPORT_ CLogHelper& id  (CLogHelper& slef);
 *      
 *   _NLOG_CFG cfg = {
 *       L"",
-*       L"ios device support %m%d %H%M.log",
+*       L"nlog-%m%d%H%M.log",
 *       L"",
 *       L"[{time}][{level}][{id}][{file}:{line}]: "
 *   };

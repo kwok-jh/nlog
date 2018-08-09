@@ -82,7 +82,6 @@
     <ClInclude Include="..\include\iocp.hpp" />
     <ClInclude Include="..\include\nlog.h" />
     <ClInclude Include="..\src\simple_lock.hpp" />
-    <ClInclude Include="..\src\string_util.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" />
