@@ -1,4 +1,3 @@
-
 #include <atltime.h>
 #include "../include/nlog.h"
 
@@ -50,57 +49,54 @@ private:
 std::wstring  StrFormat(const wchar_t * format, ...);
 std::wstring& StrReplace(std::wstring& target, const std::wstring& before, 
     const std::wstring& after);
-std::pair<std::wstring, std::wstring> StrRightCarveWhit(const std::wstring& target,  
-    const std::wstring& substr);
 std::wstring StrToWStr(const std::string& str);
 
 /*
-*	CLog static function
+*	设置静态成员对象的初始化顺序
 */
-std::map<std::string, CLog*> * CLog::__pInstances = NULL;
-CSimpleLock                  * CLog::__pLock = NULL;
+#ifdef _MSC_VER
+#pragma warning ( push )
+#pragma warning ( disable : 4073 ) 
+#pragma init_seg( lib )
+#pragma warning ( pop )
+#endif
+
+/*
+*	CLog static member
+*/
+std::map<std::string, CLog*>   CLog::__Instances;
+std::auto_ptr<CSimpleLock>     CLog::__pLock(new CSimpleLock);
 
 CLog& 
 CLog::Instance( std::string guid /*= ""*/ )
 {
-    /*
-    *	为了避免在静态库中使用全局变量导致到一系列问题, 这里统一使用裸指针
-    *   在需要的时候实例化
-    */
-    if(!__pLock)
-        __pLock = new CSimpleLock;
-
-    if(!__pInstances)
-        __pInstances = new std::map<std::string, CLog*>();
-
     CAutoLock lock(*__pLock);
 
-    std::map<std::string, CLog*>::iterator i = __pInstances->find(guid);
-    if(i == __pInstances->end())
+    std::map<std::string, CLog*>::iterator it = __Instances.find(guid);
+    if(it == __Instances.end())
     {
-        (*__pInstances)[guid] = new CLog();
+        CLog* pLog = new CLog();
+        __Instances[guid] = pLog;
+        return *pLog;
     }
-
-    return *(*__pInstances)[guid];
+    else
+        return *it->second;
 }
 
 bool 
 CLog::Release( std::string guid /*= ""*/ )
 {
-    if(!__pLock || !__pInstances)
-        return false;
-
     CLog* _this = 0;
     {
         CAutoLock lock(*__pLock);
 
-        std::map<std::string, CLog*>::iterator i = __pInstances->find(guid);
-        if(i == __pInstances->end()) {
+        std::map<std::string, CLog*>::iterator i = __Instances.find(guid);
+        if(i == __Instances.end()) {
             return false;
         }
 
         _this = i->second;
-        __pInstances->erase(i);
+        __Instances.erase(i);
     }
 
     /*
@@ -113,15 +109,6 @@ CLog::Release( std::string guid /*= ""*/ )
 
     _this->CompleteHandle(true);
     _this->__pIocp->Close();
-
-    /*
-    *	如果实例为空了, 那么主动销毁静态成员实例
-    */
-    if(__pInstances->empty())
-    {
-        delete __pLock; __pLock = NULL;
-        delete __pInstances; __pInstances = NULL;
-    }
     
     return true;
 }
@@ -129,13 +116,10 @@ CLog::Release( std::string guid /*= ""*/ )
 bool 
 CLog::ReleaseAll()
 {
-    if(!__pLock || !__pInstances)
-        return false;
-
     CAutoLock lock(*__pLock);
 
-    std::map<std::string, CLog*>::iterator i = __pInstances->begin();
-    while(i != __pInstances->end())
+    std::map<std::string, CLog*>::iterator i = __Instances.begin();
+    while(i != __Instances.end())
     {
         if(i->second->__hFile != INVALID_HANDLE_VALUE) {
             ::CloseHandle(i->second->__hFile);
@@ -145,11 +129,8 @@ CLog::ReleaseAll()
         i->second->CompleteHandle(true);
         i->second->__pIocp->Close();
 
-        i = __pInstances->erase(i);
+        i = __Instances.erase(i);
     }
-
-    delete __pLock; __pLock = NULL;
-    delete __pInstances; __pInstances = NULL;
 
     return true;
 }
@@ -203,13 +184,10 @@ CLog::GetConfig() const
     return __config;
 }
 
-LogLevel 
+void
 CLog::SetLevel( LogLevel level )
 {
-    LogLevel old = __filterLevel;
     __filterLevel = level;
-
-    return old;
 }
 
 bool 
@@ -221,7 +199,7 @@ CLog::InitLog()
         return false;
     }
     
-    std::wstring fileName = Format(__config.logDir) + _T("\\") + Format(__config.fileName);
+    std::wstring fileName = Format(__config.logDir) + L"\\" + Format(__config.fileName);
     bool bFileExist = false;
     do {
         bFileExist = (::GetFileAttributesW(fileName.c_str()) != INVALID_FILE_ATTRIBUTES);
@@ -265,26 +243,22 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
     ULONG_PTR   compKey    = 0;
     CLogIO*     pIo        = 0;
 
-    while(1)
+    while(true) 
     {
-        //获得完成队列，如果pio不为null那么就将其释放
-        __pIocp->GetStatus( &dwNumBytes, &compKey, 
-            (OVERLAPPED**)&pIo, 0 );
+        /* get已完成的状态，如果pio不为null那么就将其释放 */
+        __pIocp->GetStatus( &dwNumBytes, &compKey, (OVERLAPPED**)&pIo, 0 );
 
-        if( pIo != NULL ) 
-        { 
+        if( NULL != pIo ) { 
             ::InterlockedDecrement((LONG*)&__count);
 
             delete pIo; 
             pIo = NULL; 
         }
-        else if( !bClose )
-        {
+        else if( !bClose ) {
             break;
         }
 
-        if( bClose && 0 == __count )
-        { 
+        if( bClose && 0 == __count ) { 
             break;
         }
     }
@@ -292,29 +266,33 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
 }
 
 std::wstring 
-CLog::Format( const std::wstring& text, const LogInfomation& info )
+CLog::Format( const std::wstring& strBuf, const LogInfomation& info )
 {
     /*
     *	这里的查找, 还存在大量的性能浪费, 后面可以专门做优化
     */
-    std::wstring result  = (LPCTSTR)CTime::GetCurrentTime().Format(text.c_str());
+    std::wstring result  = (LPCTSTR)CTime::GetCurrentTime().Format(strBuf.c_str());
     std::wstring strTime = (LPCTSTR)CTime::GetCurrentTime().Format(__config.dateFormat.c_str());
-    std::wstring strId   = StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
-    std::wstring strLine = StrFormat(_T("%- 4d"), info.line);
+    std::wstring strId   = StrFormat(L"%- 8X", ::GetCurrentThreadId());
+    std::wstring strLine = StrFormat(L"%- 4d", info.line);
     
     std::wstring strLevel;
     switch(info.level) {
-    case LV_ERR: strLevel = _T("ERR"); break;
-    case LV_WAR: strLevel = _T("WAR"); break;
-    case LV_APP: strLevel = _T("APP"); break;
-    case LV_PRO: strLevel = _T("PRO"); break;
+    case LV_ERR: strLevel = L"ERR"; break;
+    case LV_WAR: strLevel = L"WAR"; break;
+    case LV_APP: strLevel = L"APP"; break;
+    case LV_PRO: strLevel = L"PRO"; break;
     }
 
     std::wstring strModule;
     {
         wchar_t buffer[MAX_PATH] = {0};
         ::GetModuleFileNameW(0, buffer, sizeof buffer);
-        strModule = StrRightCarveWhit(buffer, L"\\").first;
+
+        if(wchar_t *fname = wcsrchr(buffer, L'\\'))
+            *fname = L'\0';
+
+        strModule = buffer;
     }
 
     result = StrReplace(result, L"{module_dir}",strModule);
@@ -353,16 +331,15 @@ CLog::WriteLog( const std::wstring& strBuf )
         ::InterlockedExchangeAdd64(&__liNextOffset.QuadPart, pIo->Size());
     }
 
-    //投递重叠IO
+    /* 投递重叠IO */
     ::WriteFile( __hFile, pIo->szBuf(), pIo->Size(), NULL, pIo );
     ::InterlockedIncrement((LONG*)&__count);
 
-    if(GetLastError() == ERROR_IO_PENDING)
-    {
+    if(GetLastError() == ERROR_IO_PENDING) {
         /*
-            MSDN:The error code WSA_IO_PENDING indicates that the overlapped operation 
-            has been successfully initiated and that completion will be indicated at a 
-            later time.
+        *   MSDN:The error code WSA_IO_PENDING indicates that the overlapped operation 
+        *   has been successfully initiated and that completion will be indicated at a 
+        *   later time.
         */
         SetLastError(S_OK);
     }
@@ -375,24 +352,25 @@ CLog::WriteLog( const std::wstring& strBuf )
 CLogHelper& 
 time(CLogHelper& slef)
 {
-    slef.__strbuf << (LPCTSTR)CTime::GetCurrentTime().Format(
+    return slef << (LPCTSTR)CTime::GetCurrentTime().Format(
         CLog::Instance(slef.__sessionId).__config.dateFormat.c_str());
-    return slef;
 }
 
 CLogHelper& 
 id(CLogHelper& slef)
 {
-    slef.__strbuf << StrFormat(_T("%- 8X"), ::GetCurrentThreadId());
-    return slef;
+    return slef << StrFormat(L"%- 8X", ::GetCurrentThreadId());
 }
 
-CLogHelper::CLogHelper(LogLevel level, const char* file, const unsigned int line, const std::string& guid /*= ""*/) 
+CLogHelper::CLogHelper(LogLevel level, const char* file, 
+    const unsigned int line, const std::string& guid /*= ""*/) 
     : __sessionId(guid)
 {
-    __logInfo.file    = StrRightCarveWhit(StrToWStr(file), L"\\").first;
-    __logInfo.level   = level;
-    __logInfo.line    = line;
+    const char* fname = strrchr(file, '\\');
+
+    __logInfo.file  = StrToWStr(fname ? fname + 1 : file);
+    __logInfo.level = level;
+    __logInfo.line  = line;
 }
 
 CLogHelper::~CLogHelper()
@@ -416,8 +394,7 @@ CLogHelper::Format(const wchar_t * _Format, ...)
     vswprintf_s(&text[0], text.capacity(), _Format, marker);
     va_end(marker);
 
-    __strbuf << text.data();
-    return *this;
+    return (*this) << text.data();
 }
 
 CLogHelper& 
@@ -430,8 +407,7 @@ CLogHelper::Format(const char * _Format, ...)
     vsprintf_s(&text[0], text.capacity(), _Format, marker);
     va_end(marker);
 
-    __strbuf << StrToWStr(text.data());
-    return *this;
+    return (*this) << StrToWStr(text.data());
 }
 
 CLogHelper& 
@@ -443,8 +419,7 @@ CLogHelper::operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &))
 CLogHelper& 
 CLogHelper::operator<<(const std::string& info)
 {
-    __strbuf << StrToWStr(info);
-    return *this;
+    return (*this) << StrToWStr(info);
 }
 
 /*
@@ -471,25 +446,12 @@ StrReplace(std::wstring& target, const std::wstring& before,
     std::wstring::size_type afterLen  = after.length();  
     std::wstring::size_type pos       = target.find(before, 0);
 
-    while( pos != std::wstring::npos )  
-    {  
+    while( pos != std::wstring::npos ) {  
         target.replace(pos, beforeLen, after);  
         pos = target.find(before, (pos + afterLen));  
     }
 
     return target;
-}
-
-std::pair<std::wstring, std::wstring> 
-StrRightCarveWhit(const std::wstring& target, const std::wstring& substr)
-{
-    std::wstring::size_type index;
-    if( (index = target.rfind(substr)) != std::wstring::npos )
-    {
-        return std::make_pair(target.substr(0, index), target.substr(index + 1));
-    }
-
-    return std::pair<std::wstring, std::wstring>();
 }
 
 std::wstring 
@@ -498,7 +460,7 @@ StrToWStr(const std::string& str)
     size_t len = ::MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
 
     std::wstring buff(len, 0);
-    ::MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, (LPWSTR)const_cast<wchar_t*>(buff.data()), len);
+    ::MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, (LPWSTR)buff.data(), len);
 
     if(buff[buff.size()-1] == '\0')
         buff.erase( buff.begin() + (buff.size()-1) );

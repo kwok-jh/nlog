@@ -111,8 +111,8 @@ class NLOG_LIB CLog
     friend class CLogHelper;
     friend NLOG_LIB CLogHelper& time(CLogHelper& slef);
 
-    static std::map<std::string, CLog*> * __pInstances;
-    static CSimpleLock                  * __pLock;
+    static std::map<std::string, CLog*> __Instances;
+    static std::auto_ptr<CSimpleLock>   __pLock;
 public:
     /*
     *   获得一个Log的实例, 允许存在多个Log实例, guid代表实例的唯一Id
@@ -127,11 +127,11 @@ public:
     *   Log配置, 输出文件名称格式, 打印格式等...
     *   要注意的是, 设置必须在打印第一条日志之前完成否则可能不起任何作用 
     */
-    bool     SetConfig(const Config& setting);
-    Config   GetConfig() const;
+    bool    SetConfig(const Config& setting);
+    Config  GetConfig() const;
 
     /* 在任何时候都可以指定日志打印的等级 */
-    LogLevel SetLevel(LogLevel level); 
+    void    SetLevel(LogLevel level); 
 protected:
     bool    InitLog();
     bool    CompleteHandle(bool bClose = false);
@@ -142,7 +142,7 @@ protected:
         unsigned int line;
         std::wstring  file;
     };
-    std::wstring Format (const std::wstring& text, const LogInfomation& info = LogInfomation());
+    std::wstring Format (const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
     CLog& FormatWriteLog(const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
     CLog& WriteLog      (const std::wstring& strBuf);
 private:
@@ -211,7 +211,7 @@ NLOG_LIB CLogHelper& id  (CLogHelper& slef);
 /*
 *	使用指定的Log实例, 格式化输出一条信息
 *   example:
-*   #define LOG_UID    "device_support"
+*   #define LOG_UID    "custom log id"
 *   #define LOG_ERR    _NLOG_ERR_WITH_ID(LOG_UID)   
 *   ...
 *   LOG_ERR("hello") << "nlog";     
@@ -239,6 +239,14 @@ NLOG_LIB CLogHelper& id  (CLogHelper& slef);
 #define _NLOG_SET_CONFIG(cfg)                nlog::CLog::Instance().SetConfig(cfg)
 #define _NLOG_SET_CONFIG_WITH_ID(id, cfg)    nlog::CLog::Instance(id).SetConfig(cfg)
 
+/*
+*	设置实时打印等级
+*   example: - 设置只打印警告及以上的日志
+*   
+*   _NLOG_SET_LEVE(LV_WAR); 
+*/
+#define _NLOG_SET_LEVE(lev)                  nlog::CLog::Instance().SetLevel(lev)
+#define _NLOG_SET_LEVE_WITH_ID(id, lev)      nlog::CLog::Instance(id).SetLevel(lev)
 /*
 *	执行清理工作, 销毁所有存在的nlog实例
 *   example: - 初始配置与自动销毁

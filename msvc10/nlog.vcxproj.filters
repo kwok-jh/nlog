@@ -22,6 +22,9 @@
     <ClInclude Include="..\src\simple_lock.hpp">
       <Filter>源文件</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\iocp.hpp">
+      <Filter>源文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" />
