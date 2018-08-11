@@ -11,13 +11,12 @@
 
  ## 快速上手
  ```
- #include "nlog.h"                                                      //包含头文件, 并连接对应的lib
+ #include "nlog.h"                                                //包含头文件, 并连接对应的lib
  ...
- _NLOG_APP("Hello %s!", "World");                                       //打印C风格    多字节
- _NLOG_WAR() << nlog::time  << L" 此后起我们的征程便是星辰大海...";     //打印C++风格  宽字节
- _NLOG_ERR("Oh, %s!", "No") << L" 有人动了你的代码并在里面下了毒...";   //混搭式打印
+ _NLOG_ERR("Hello, %s", "nlog") << " Now Time:" << nlog::time;    //c,c++风格混搭格式化输出
+ _NLOG_WAR(L"借用一句话")        << " 此后我们的征程便是星辰大海...";
  ...
- _NLOG_SHUTDOWN();                                                      //最后执行清理
+ _NLOG_SHUTDOWN();                                                //最后执行清理
  ```
  
  ## 组织结构
@@ -39,7 +38,7 @@
  | ./msvc10/example/01_simple.vcxproj           | 最简单的使用例子(使用动态库)          |
  | ./msvc10/example/02_custom_style.vcxproj     | 自定义打印风格的例子(使用静态库)      |
  | ./msvc10/example/03_multiple_thread.vcxproj  | 多线程并发打印同一文件40w日志         |
- | ./msvc10/example/04_multiple_instance.vcxproj| 多线日志实例不同配置打印4个不同的文件 |
+ | ./msvc10/example/04_multiple_instance.vcxproj| 多日志实例不同配置打印4个不同的文件  |
  
  ## 更新
  1. 2018-8-03 - 更新example
