@@ -79,8 +79,8 @@
     <ClCompile Include="..\src\nlog.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\iocp.hpp" />
     <ClInclude Include="..\include\nlog.h" />
+    <ClInclude Include="..\src\iocp.hpp" />
     <ClInclude Include="..\src\simple_lock.hpp" />
   </ItemGroup>
   <ItemGroup>
