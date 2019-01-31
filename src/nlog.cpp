@@ -300,6 +300,7 @@ CLog::Format( const std::wstring& strBuf, const LogInfomation& info )
     result = StrReplace(result, L"{time}", strTime);
     result = StrReplace(result, L"{id}", strId);
     result = StrReplace(result, L"{file}", info.file);
+    result = StrReplace(result, L"{func}", info.func);
     result = StrReplace(result, L"{line}", strLine);
     
     return result;
@@ -362,13 +363,15 @@ id(CLogHelper& slef)
     return slef << StrFormat(L"%- 8X", ::GetCurrentThreadId());
 }
 
-CLogHelper::CLogHelper(LogLevel level, const char* file, 
-    const unsigned int line, const std::string& guid /*= ""*/) 
+CLogHelper::CLogHelper(LogLevel level, const char* file, const unsigned int line, 
+                                       const char* func, const std::string& guid /*= ""*/) 
     : __sessionId(guid)
 {
-    const char* fname = strrchr(file, '\\');
+    const char* dfile = strrchr(file, '\\');
+    const char* dfunc = strrchr(func, ':');
 
-    __logInfo.file  = StrToWStr(fname ? fname + 1 : file);
+    __logInfo.file  = StrToWStr(dfile ? dfile + 1 : "");
+    __logInfo.func  = StrToWStr(dfunc ? dfunc + 1 : "");
     __logInfo.level = level;
     __logInfo.line  = line;
 }

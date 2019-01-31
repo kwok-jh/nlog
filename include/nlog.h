@@ -3,10 +3,8 @@
 
 /*
 *    nlog
-*    创建:  2016-6-16
-*    修改:  2018-8-5
-*    Email：<kwok-jh@qq.com>
-*    Git:   https://gitee.com/skygarth/nlog
+*    Date:   2016-06-16
+*    Git :   https://gitee.com/kwok-jh/nlog
 
 *    异步
 *    多线程安全
@@ -93,7 +91,8 @@ struct Config
     *   {id}              当前打印日志的线程id
     *   {file}            当前打印日志的源文件名
     *   {line}            当前打印日志的源文件行
-    */
+    *   {func}            当前打印日志的源文件函数名
+    */  
     std::wstring prefixion;
 };
 
@@ -141,6 +140,7 @@ protected:
         LogLevel level;
         unsigned int line;
         std::wstring  file;
+        std::wstring  func;
     };
     std::wstring Format (const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
     CLog& FormatWriteLog(const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
@@ -162,7 +162,8 @@ private:
 class NLOG_LIB CLogHelper
 {
 public:
-    CLogHelper(LogLevel level, const char* file, const unsigned int line, const std::string& guid = "");
+    CLogHelper(LogLevel level, const char* file, const unsigned int line, 
+                               const char* func, const std::string& guid = "");
     ~CLogHelper();
 
     CLogHelper& Format();
@@ -203,12 +204,12 @@ NLOG_LIB CLogHelper& id  (CLogHelper& slef);
 *   example:
 *   _NLOG_ERR("hello") << "nlog";
 */
-#define _NLOG_ERR  nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__).Format
-#define _NLOG_WAR  nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__).Format
-#define _NLOG_APP  nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__).Format
-#define _NLOG_PRO  nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__).Format
+#define _NLOG_ERR  nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, __FUNCTION__).Format
+#define _NLOG_WAR  nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, __FUNCTION__).Format
+#define _NLOG_APP  nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__, __FUNCTION__).Format
+#define _NLOG_PRO  nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__, __FUNCTION__).Format
 
-/*
+/*  
 *	使用指定的Log实例, 格式化输出一条信息
 *   example:
 *   #define LOG_UID    "custom log id"
@@ -216,10 +217,10 @@ NLOG_LIB CLogHelper& id  (CLogHelper& slef);
 *   ...
 *   LOG_ERR("hello") << "nlog";     
 */
-#define _NLOG_ERR_WITH_ID(id) nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, id).Format
-#define _NLOG_WAR_WITH_ID(id) nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, id).Format
-#define _NLOG_APP_WITH_ID(id) nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__, id).Format
-#define _NLOG_PRO_WITH_ID(id) nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__, id).Format
+#define _NLOG_ERR_WITH_ID(id) nlog::CLogHelper(nlog::LV_ERR, __FILE__, __LINE__, __FUNCTION__, id).Format
+#define _NLOG_WAR_WITH_ID(id) nlog::CLogHelper(nlog::LV_WAR, __FILE__, __LINE__, __FUNCTION__, id).Format
+#define _NLOG_APP_WITH_ID(id) nlog::CLogHelper(nlog::LV_APP, __FILE__, __LINE__, __FUNCTION__, id).Format
+#define _NLOG_PRO_WITH_ID(id) nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__, __FUNCTION__, id).Format
 
 /*
 *   设置初始配置
