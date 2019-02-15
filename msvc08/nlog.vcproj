@@ -17,9 +17,8 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="$(SolutionDir)bin"
-			IntermediateDirectory="$(SolutionDir)bin\tmp\$(ProjectName)\$(ConfigurationName)"
 			ConfigurationType="2"
+			InheritedPropertySheets="..\..\..\props\project_output_bin_debug_msvc08.vsprops"
 			CharacterSet="1"
 			ManagedExtensions="0"
 			>
@@ -60,7 +59,6 @@
 				Name="VCLinkerTool"
 				OutputFile="$(OutDir)\$(ProjectName)d.dll"
 				GenerateDebugInformation="true"
-				ImportLibrary="$(SolutionDir)bin/lib/$(TargetName).lib"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -89,9 +87,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="$(SolutionDir)bin"
-			IntermediateDirectory="$(SolutionDir)bin\tmp\$(ProjectName)\$(ConfigurationName)"
 			ConfigurationType="2"
+			InheritedPropertySheets="..\..\..\props\project_output_bin_release_msvc08.vsprops"
 			CharacterSet="1"
 			ManagedExtensions="0"
 			WholeProgramOptimization="1"
@@ -130,7 +127,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				ImportLibrary="$(SolutionDir)bin/lib/$(TargetName).lib"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -167,19 +163,15 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath="..\src\iocp.hpp"
+				>
+			</File>
+			<File
 				RelativePath="..\src\nlog.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\src\simple_lock.hpp"
-				>
-			</File>
-			<File
-				RelativePath="..\src\string_conversions.hpp"
-				>
-			</File>
-			<File
-				RelativePath="..\src\string_util.hpp"
 				>
 			</File>
 		</Filter>
@@ -188,10 +180,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
-			<File
-				RelativePath="..\include\iocp.hpp"
-				>
-			</File>
 			<File
 				RelativePath="..\include\nlog.h"
 				>

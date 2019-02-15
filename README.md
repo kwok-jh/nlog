@@ -30,7 +30,7 @@
  | ./msvc08/nlog.vcproj                         | 动态库项目文件                        |
  | ./msvc08/nloglib.vcproj                      | 静态库项目文件                        |
  | ./msvc10                                     | vs2010                                |
- | ./msvc10nlog.sln                             | vs2010解决方案                        |
+ | ./msvc10/nlog.sln                            | vs2010解决方案                        |
  | ./msvc10/nlog.vcproj                         | 动态库项目文件                        |
  | ./msvc10/nloglib.vcproj                      | 静态库项目文件                        |
  | ....                                         | ....                                  |
@@ -38,7 +38,7 @@
  | ./msvc10/example/01_simple.vcxproj           | 最简单的使用例子(使用动态库)          |
  | ./msvc10/example/02_custom_style.vcxproj     | 自定义打印风格的例子(使用静态库)      |
  | ./msvc10/example/03_multiple_thread.vcxproj  | 多线程并发打印同一文件40w日志         |
- | ./msvc10/example/04_multiple_instance.vcxproj| 多日志实例不同配置打印4个不同的文件  |
+ | ./msvc10/example/04_multiple_instance.vcxproj| 多日志实例不同配置打印4个不同的文件   |
  
  ## 更新
  1. 2018-8-03 - 更新example
