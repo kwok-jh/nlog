@@ -16,11 +16,14 @@ int main()
 
     _NLOG_WAR() << nlog::time  << L" 此后起我们的征程便是星辰大海...";     //打印C++风格  宽字节
 
+    _NLOG_ERR("{1} This is the {2} of %s {3}.", "Cpp")                     //打印C++风格 
+        % nlog::time % "output" % L"style";   
+
     _NLOG_ERR("Oh, %s!", "No") << L" 有人动了你的代码并在里面下了毒...";   //混搭式打印
 
     _NLOG_SET_LEVE(nlog::LV_WAR);                                          //设置只打印警告及以上的
-    _NLOG_APP(L"糟糕~~~有交警查酒驾...");                                      
-    _NLOG_WAR(L"哈哈~~~成功溜出来了...");
+    _NLOG_APP(L"这是一条应用消息...");                                      
+    _NLOG_WAR(L"这是一条警告消息...");
 
     _NLOG_SHUTDOWN();                                                      //关闭nlog, 清理资源
     return 0;

@@ -68,7 +68,7 @@ std::map<std::string, CLog*>   CLog::__Instances;
 std::auto_ptr<CSimpleLock>     CLog::__pLock(new CSimpleLock);
 
 CLog& 
-CLog::Instance( std::string guid /*= ""*/ )
+CLog::Instance( const std::string& guid /*= ""*/ )
 {
     CAutoLock lock(*__pLock);
 
@@ -84,7 +84,7 @@ CLog::Instance( std::string guid /*= ""*/ )
 }
 
 bool 
-CLog::Release( std::string guid /*= ""*/ )
+CLog::Release( const std::string& guid /*= ""*/ )
 {
     CLog* _this = 0;
     {
@@ -190,6 +190,12 @@ CLog::SetLevel( LogLevel level )
     __filterLevel = level;
 }
 
+LogLevel 
+CLog::GetLevel() const
+{
+    return __filterLevel;
+}
+
 bool 
 CLog::InitLog()
 {
@@ -266,7 +272,7 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
 }
 
 std::wstring 
-CLog::Format( const std::wstring& strBuf, const LogInfomation& info )
+CLog::Format( const std::wstring& strBuf, const LogContext& context /*= LogContext()*/ )
 {
     /*
     *	这里的查找, 还存在大量的性能浪费, 后面可以专门做优化
@@ -274,10 +280,10 @@ CLog::Format( const std::wstring& strBuf, const LogInfomation& info )
     std::wstring result  = (LPCTSTR)CTime::GetCurrentTime().Format(strBuf.c_str());
     std::wstring strTime = (LPCTSTR)CTime::GetCurrentTime().Format(__config.dateFormat.c_str());
     std::wstring strId   = StrFormat(L"%- 8X", ::GetCurrentThreadId());
-    std::wstring strLine = StrFormat(L"%- 4d", info.line);
+    std::wstring strLine = StrFormat(L"%- 4d", context.line);
     
     std::wstring strLevel;
-    switch(info.level) {
+    switch(context.level) {
     case LV_ERR: strLevel = L"ERR"; break;
     case LV_WAR: strLevel = L"WAR"; break;
     case LV_APP: strLevel = L"APP"; break;
@@ -299,22 +305,22 @@ CLog::Format( const std::wstring& strBuf, const LogInfomation& info )
     result = StrReplace(result, L"{level}", strLevel);
     result = StrReplace(result, L"{time}", strTime);
     result = StrReplace(result, L"{id}", strId);
-    result = StrReplace(result, L"{file}", info.file);
-    result = StrReplace(result, L"{func}", info.func);
+    result = StrReplace(result, L"{file}", context.file);
+    result = StrReplace(result, L"{func}", context.func);
     result = StrReplace(result, L"{line}", strLine);
     
     return result;
 }
 
 CLog& 
-CLog::FormatWriteLog( const std::wstring& strBuf, const LogInfomation& info /*= Loginfomation()*/ )
+CLog::FormatWriteLog( const std::wstring& strBuf, const LogContext& context /*= LogContext()*/ )
 {
-    if(__filterLevel >= info.level) {
+    if(__filterLevel >= context.level) {
         if(!__bAlreadyInit) {
             InitLog();
         }
 
-        return WriteLog(Format(__config.prefixion, info) + strBuf + L"\r\n");
+        return WriteLog(Format(__config.prefixion, context) + strBuf + L"\r\n");
     }
     else
         return *this;
@@ -329,14 +335,15 @@ CLog::WriteLog( const std::wstring& strBuf )
     {
         CAutoLock lock(*__pLock);
         pIo = new CLogIO(strBuf, __liNextOffset);
-        ::InterlockedExchangeAdd64(&__liNextOffset.QuadPart, pIo->Size());
+        __liNextOffset.QuadPart += pIo->Size();
     }
 
     /* 投递重叠IO */
     ::WriteFile( __hFile, pIo->szBuf(), pIo->Size(), NULL, pIo );
     ::InterlockedIncrement((LONG*)&__count);
 
-    if(GetLastError() == ERROR_IO_PENDING) {
+    if(GetLastError() == ERROR_IO_PENDING) 
+    {
         /*
         *   MSDN:The error code WSA_IO_PENDING indicates that the overlapped operation 
         *   has been successfully initiated and that completion will be indicated at a 
@@ -351,34 +358,55 @@ CLog::WriteLog( const std::wstring& strBuf )
 *	CLogHelper firend function
 */
 CLogHelper& 
-time(CLogHelper& slef)
+time(CLogHelper& slef, bool append)
 {
-    return slef << (LPCTSTR)CTime::GetCurrentTime().Format(
-        CLog::Instance(slef.__sessionId).__config.dateFormat.c_str());
+    if(append)
+    {
+        return slef << (LPCTSTR)CTime::GetCurrentTime().Format(
+            slef.__log.__config.dateFormat.c_str());
+    }
+    else
+    {
+        return slef % (LPCTSTR)CTime::GetCurrentTime().Format(
+            slef.__log.__config.dateFormat.c_str());
+    }
 }
 
 CLogHelper& 
-id(CLogHelper& slef)
+id(CLogHelper& slef, bool append)
 {
-    return slef << StrFormat(L"%- 8X", ::GetCurrentThreadId());
+    if(append)
+        return slef << StrFormat(L"%- 8X", ::GetCurrentThreadId());
+    else
+        return slef % StrFormat(L"%- 8X", ::GetCurrentThreadId());
+}
+
+CLogHelper& 
+d_out(CLogHelper& slef, bool append)
+{
+    return slef.DebugOutput();
 }
 
 CLogHelper::CLogHelper(LogLevel level, const char* file, const unsigned int line, 
                                        const char* func, const std::string& guid /*= ""*/) 
-    : __sessionId(guid)
+    : __log(CLog::Instance(guid))
+    , __argIndex(0)
 {
-    const char* dfile = strrchr(file, '\\');
-    const char* dfunc = strrchr(func, ':');
+    char* dfunc = (char *)strrchr(func, ':');
+    char* dfile = (char *)file;
+
+    while (*dfile++);
+    while (--dfile != file && *dfile != char('\\') && *dfile != char('/'));
 
     __logInfo.file  = StrToWStr(dfile ? dfile + 1 : "");
     __logInfo.func  = StrToWStr(dfunc ? dfunc + 1 : "");
-    __logInfo.level = level;
     __logInfo.line  = line;
+    __logInfo.level = level;
 }
 
 CLogHelper::~CLogHelper()
 {
-    CLog::Instance(__sessionId).FormatWriteLog(__strbuf.str(), __logInfo);
+    __log.FormatWriteLog(__strbuf, __logInfo);
 }
 
 CLogHelper& 
@@ -388,41 +416,93 @@ CLogHelper::Format()
 }
 
 CLogHelper& 
-CLogHelper::Format(const wchar_t * _Format, ...)
+CLogHelper::Format(const wchar_t * format, ...)
 {
-    va_list  marker = NULL;  
-    va_start(marker, _Format);
+    va_list ap = 0;  
+    va_start(ap, format);
+    Format_(format, ap);
+    va_end(ap);
 
-    std::wstring text(_vscwprintf(_Format, marker) + 1, 0);
-    vswprintf_s(&text[0], text.capacity(), _Format, marker);
-    va_end(marker);
+    return (*this);
+}
 
+CLogHelper& 
+CLogHelper::Format(const char * format, ...)
+{
+    va_list ap = 0;  
+    va_start(ap, format);
+    Format_(format, ap);
+    va_end(ap);
+
+    return (*this);
+}
+
+CLogHelper& 
+CLogHelper::Format_(const wchar_t * format, va_list ap)
+{
+    std::wstring text;
+                 text.resize(_vscwprintf(format, ap) + 1);
+    vswprintf_s(&text[0], text.capacity(), format, ap);
     return (*this) << text.data();
 }
 
 CLogHelper& 
-CLogHelper::Format(const char * _Format, ...)
+CLogHelper::Format_(const char * format, va_list ap)
 {
-    va_list  marker = NULL;  
-    va_start(marker, _Format);
-
-    std::string text(_vscprintf(_Format, marker) + 1, 0);
-    vsprintf_s(&text[0], text.capacity(), _Format, marker);
-    va_end(marker);
-
+    std::string text;
+                text.resize(_vscprintf(format, ap) + 1);
+    vsprintf_s(&text[0], text.capacity(), format, ap);
     return (*this) << StrToWStr(text.data());
 }
 
 CLogHelper& 
-CLogHelper::operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &))
+CLogHelper::DebugOutput()
 {
-    return ((*pfn)(*this));
+    ::OutputDebugStringW(__strbuf.c_str());
+    ::OutputDebugStringW(L"\r\n");
+
+    return *this;
+}
+
+CLogHelper& 
+CLogHelper::operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &, bool))
+{
+    return ((*pfn)(*this, true));
 }
 
 CLogHelper& 
 CLogHelper::operator<<(const std::string& info)
 {
     return (*this) << StrToWStr(info);
+}
+
+CLogHelper& 
+CLogHelper::operator<<(const std::wstring& info)
+{
+    __strbuf += info;
+    return *this;
+}
+
+CLogHelper& 
+CLogHelper::operator%(CLogHelper&(__cdecl* pfn)(CLogHelper &, bool))
+{
+    return ((*pfn)(*this, false));
+}
+
+CLogHelper& 
+CLogHelper::operator%(const std::string& arg)
+{
+    return (*this) % StrToWStr(arg);
+}
+
+CLogHelper& 
+CLogHelper::operator%(const std::wstring& arg)
+{
+    std::wstring specifier(5, 0);
+    swprintf_s(&specifier[0], specifier.capacity(), L"{%d}", ++__argIndex);
+    
+    StrReplace(__strbuf, specifier.c_str(), arg);
+    return *this;
 }
 
 /*

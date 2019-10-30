@@ -3,8 +3,8 @@
 
 /*
 *    nlog
-*    Date:   2016-06-16
-*    Git :   https://gitee.com/kwok-jh/nlog
+*    Date:       2016-06-16
+*    Repository: https://gitee.com/kwok-jh/nlog
 
 *    异步
 *    多线程安全
@@ -20,7 +20,13 @@
 #include <map>
 #include <sstream>
 
-#define  WIN32_LEAN_AND_MEAN 
+#ifndef  NOMINMAX
+#   define  NOMINMAX
+#endif
+
+#ifndef WIN32_LEAN_AND_MEAN
+#   define  WIN32_LEAN_AND_MEAN 
+#endif
 #include <windows.h>
 
 /* export */
@@ -52,6 +58,17 @@ enum LogLevel
     LV_WAR = 1,    
     LV_APP = 2,    
     LV_PRO = 3
+};
+
+/*
+*	日志上下文
+*/
+struct LogContext
+{
+    LogLevel     level;
+    unsigned int line;
+    std::wstring file;
+    std::wstring func;
 };
 
 /*
@@ -108,7 +125,7 @@ class NLOG_LIB CLog
     CLog operator=(const CLog&);
 
     friend class CLogHelper;
-    friend NLOG_LIB CLogHelper& time(CLogHelper& slef);
+    friend NLOG_LIB CLogHelper& time(CLogHelper& slef, bool append);
 
     static std::map<std::string, CLog*> __Instances;
     static std::auto_ptr<CSimpleLock>   __pLock;
@@ -118,8 +135,8 @@ public:
     *   每一个实例独占一个日志文件, 若它们之间具有相同的文件名称格式
     *   那么后一个被实例化的Log将指向一个具有"_1"的名称
     */
-    static CLog& Instance(std::string guid = "");
-    static bool  Release (std::string guid = "");
+    static CLog& Instance(const std::string& guid = "");
+    static bool  Release (const std::string& guid = "");
     static bool  ReleaseAll();
 
     /* 
@@ -130,21 +147,17 @@ public:
     Config  GetConfig() const;
 
     /* 在任何时候都可以指定日志打印的等级 */
-    void    SetLevel(LogLevel level); 
+    void     SetLevel(LogLevel level); 
+    LogLevel GetLevel() const;
+
 protected:
     bool    InitLog();
     bool    CompleteHandle(bool bClose = false);
 
-    struct  LogInfomation
-    {
-        LogLevel level;
-        unsigned int line;
-        std::wstring  file;
-        std::wstring  func;
-    };
-    std::wstring Format (const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
-    CLog& FormatWriteLog(const std::wstring& strBuf, const LogInfomation& info = LogInfomation());
+    std::wstring Format (const std::wstring& strBuf, const LogContext& context = LogContext());
+    CLog& FormatWriteLog(const std::wstring& strBuf, const LogContext& context = LogContext());
     CLog& WriteLog      (const std::wstring& strBuf);
+
 private:
     CIOCP*   __pIocp; 
     HANDLE   __hFile;
@@ -152,7 +165,7 @@ private:
     bool     __bAlreadyInit;
     LogLevel __filterLevel;
 
-    unsigned int __count;
+    unsigned int  __count;
     LARGE_INTEGER __liNextOffset;
 };
 
@@ -167,31 +180,54 @@ public:
     ~CLogHelper();
 
     CLogHelper& Format();
-    CLogHelper& Format(const wchar_t * _Format, ...);
-    CLogHelper& Format(const char    * _Format, ...);
+    CLogHelper& Format(const wchar_t * format, ...);
+    CLogHelper& Format(const char    * format, ...);
+    CLogHelper& Format_(const wchar_t * format, va_list ap);
+    CLogHelper& Format_(const char    * format, va_list ap);
+    CLogHelper& DebugOutput();
 
     template<class T> 
     CLogHelper& operator<<(T info);
     CLogHelper& operator<<(const std::string& info);
-    CLogHelper& operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &));
+    CLogHelper& operator<<(const std::wstring& info);
+    CLogHelper& operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &, bool));
 
-    friend NLOG_LIB CLogHelper& time(CLogHelper& slef);
-    friend NLOG_LIB CLogHelper& id  (CLogHelper& slef);
+    template<class T> 
+    CLogHelper& operator%(T arg);
+    CLogHelper& operator%(const std::string& arg);
+    CLogHelper& operator%(const std::wstring& arg);
+    CLogHelper& operator%(CLogHelper&(__cdecl* pfn)(CLogHelper &, bool));
+
+    friend NLOG_LIB CLogHelper& time (CLogHelper& slef, bool append);
+    friend NLOG_LIB CLogHelper& id   (CLogHelper& slef, bool append);
+    friend NLOG_LIB CLogHelper& d_out(CLogHelper& slef, bool append);
 
 private:
-    std::string __sessionId;
-    std::wstringstream  __strbuf;
-    CLog::LogInfomation __logInfo;
+    CLog        & __log;
+    LogContext    __logInfo;
+    int           __argIndex;
+    std::wstring  __strbuf;
 };
 
-template<class T> 
-CLogHelper& CLogHelper::operator<<(T info){
-    __strbuf << info;
-    return *this;
+template<class T>
+inline std::wstring TtoWStr(const T& arg) 
+{
+    std::wstringstream temp;
+    temp << arg;
+    return temp.str();
 }
 
-NLOG_LIB CLogHelper& time(CLogHelper& slef);
-NLOG_LIB CLogHelper& id  (CLogHelper& slef);
+template<class T> 
+inline CLogHelper& CLogHelper::operator<<(T info) 
+{
+    return *this << nlog::TtoWStr(info);
+}
+
+template<class T> 
+inline CLogHelper& CLogHelper::operator%(T arg) 
+{
+    return *this % nlog::TtoWStr<T>(arg);
+}
 
 }// namespace nlog
 
