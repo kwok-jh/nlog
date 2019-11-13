@@ -31,16 +31,16 @@
 
 /* export */
 #ifdef  NLOG_STATIC_LIB
-# define NLOG_LIB 
+#   define NLOG_LIB 
 #else
 
 #pragma warning( push )
 #pragma warning( disable : 4251 ) 
 
 #ifdef  NLOG_SHARE_LIB
-# define NLOG_LIB __declspec(dllexport)
+#   define NLOG_LIB __declspec(dllexport)
 #else
-# define NLOG_LIB __declspec(dllimport)
+#   define NLOG_LIB __declspec(dllimport)
 #endif // NLOG_SHARE_LIB
 #endif // NLOG_STATIC_LIB
 
@@ -85,7 +85,7 @@ struct Config
     std::wstring logDir;
 
     /*
-    *	文件名格式        default: "log-%m%d-%H%M.log"    如(log-0805-2348.log)
+    *	文件名格式        default: "log-%Y%m%d.log"    如(log-20180805.log)
     *   可选变量:
     *   %Y,%m,%d,%H ...   时间日期格式化
     */
@@ -111,6 +111,30 @@ struct Config
     *   {func}            当前打印日志的源文件函数名
     */  
     std::wstring prefixion;
+
+    /*
+    *   前缀匹配          default: ""
+    *   当自动删除冗余文件时, 用于甄别是否属于自身产生的日志文件
+    *   如设置为: "log-" 则会遍历[logDir]指向的目录下文件名前缀匹配的文件, 后对结果进行排序,
+    *   再根据[maxFileNumber]指定的最大文件数量, 删除多余的文件
+    */
+    std::wstring prefixMatch;
+
+    /*
+    *	最大文件数        default: -1
+    *   设置[prefixMatch]后方可有效
+    *   -1: 文件数量无限制
+    *    0: 无效, 将会以默认值代替
+    */
+    int maxFileNumber;
+
+    /*
+    *	最大文件大小      default: -1 单位字节
+    *   当单个文件超出指定的大小时, 将创建新的文件
+    *     -1: 大小无限制
+    *   <1MB: 小于1MB则等于1MB
+    */
+    int maxFileSize;
 };
 
 /*
@@ -129,6 +153,7 @@ class NLOG_LIB CLog
 
     static std::map<std::string, CLog*> __Instances;
     static std::auto_ptr<CSimpleLock>   __pLock;
+
 public:
     /*
     *   获得一个Log的实例, 允许存在多个Log实例, guid代表实例的唯一Id
@@ -151,8 +176,10 @@ public:
     LogLevel GetLevel() const;
 
 protected:
-    bool    InitLog();
-    bool    CompleteHandle(bool bClose = false);
+    bool InitLog();
+    void UinitLog();
+    void CleanStoreDir();
+    bool CompleteHandle(bool bClose = false);
 
     std::wstring Format (const std::wstring& strBuf, const LogContext& context = LogContext());
     CLog& FormatWriteLog(const std::wstring& strBuf, const LogContext& context = LogContext());
@@ -232,7 +259,7 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 }// namespace nlog
 
 #ifndef  NLOG_STATIC_LIB
-#pragma warning( pop )
+#   pragma warning( pop )
 #endif
 
 /*
@@ -284,6 +311,7 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 */
 #define _NLOG_SET_LEVE(lev)                  nlog::CLog::Instance().SetLevel(lev)
 #define _NLOG_SET_LEVE_WITH_ID(id, lev)      nlog::CLog::Instance(id).SetLevel(lev)
+
 /*
 *	执行清理工作, 销毁所有存在的nlog实例
 *   example: - 初始配置与自动销毁

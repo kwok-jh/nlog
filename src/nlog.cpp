@@ -1,10 +1,94 @@
+#include "nlog.h"
 #include <atltime.h>
-#include "../include/nlog.h"
-
+#include <vector>
+#include <algorithm>
+#include <functional>
 #include "iocp.hpp"
 #include "simple_lock.hpp"
 
-namespace nlog{
+namespace nlog {
+namespace detail {
+
+/*
+*	If return true that the file or directory is exists.
+*   Otherwise return false.
+*/
+inline bool FileExists(const std::wstring& file)
+{
+    return ::GetFileAttributesW(file.c_str()) != INVALID_FILE_ATTRIBUTES;
+}
+
+/*
+*	Return the parent directory of the specified path.
+*/
+inline std::wstring FindParentDirectory(const std::wstring& path)
+{
+    size_t pos  = path.npos;
+    size_t pos1 = path.rfind('\\');
+    size_t pos2 = path.rfind('/');
+
+    if(pos1 == path.npos)
+        pos = pos2;
+    else if(pos2 == path.npos)
+        pos = pos1;
+    else
+        pos = std::max(pos1, pos2);
+
+    return path.substr(0, pos);
+}
+
+/*
+*	Create directories recursively
+*/
+inline bool CreateDirectories(const std::wstring& path)
+{
+    if(::GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES)
+        return true;
+
+    std::wstring pdir = path;
+    if(!FileExists(pdir = FindParentDirectory(pdir)))
+        CreateDirectories(pdir);
+
+    return ::CreateDirectoryW(path.c_str(), NULL) != 0;
+}
+
+/*
+*   Return a copy of the the filename.
+*   etc. log.txt -> log(1).txt
+*                   log(1).txt -> log(2).txt
+*/
+inline std::wstring FileNameIncrement(const std::wstring& file)
+{
+    size_t dotPos = file.rfind(L".");
+    size_t leftPos = file.rfind(L"(");
+    size_t rightPos = file.rfind(L")");
+
+    std::wstring copy = file;
+
+    if(leftPos == file.npos || rightPos == file.npos ||
+        leftPos > rightPos)
+    {
+        if(dotPos == file.npos)
+            return copy + L"(1)";
+
+        return copy.insert(dotPos, L"(1)");
+    }
+
+    ++leftPos;
+    int number = 1;
+
+    std::wstring index = file.substr(leftPos, rightPos - leftPos);
+    if(!index.empty())
+    {
+        wchar_t * end;
+        number = wcstol(index.c_str(), &end, 10);
+        ++number;
+    }
+
+    return copy.replace(leftPos, rightPos - leftPos, TtoWStr(number));
+}
+
+} // detail
 
 /*
 *	CLogIO used for overlapping IO
@@ -32,14 +116,15 @@ public:
         return __strBuf.length() * sizeof(std::wstring::value_type);
     }
 
-    const wchar_t* szBuf() 
+    const wchar_t* szBuf() const
     {
         return __strBuf.c_str();
     }
+
 private:
     void Init() 
     {
-        memset( this, 0, sizeof(OVERLAPPED) );
+        memset(this, 0, sizeof(OVERLAPPED));
     }
 };
 
@@ -49,7 +134,7 @@ private:
 std::wstring  StrFormat(const wchar_t * format, ...);
 std::wstring& StrReplace(std::wstring& target, const std::wstring& before, 
     const std::wstring& after);
-std::wstring StrToWStr(const std::string& str);
+std::wstring  StrToWStr(const std::string& str);
 
 /*
 *	设置静态成员对象的初始化顺序
@@ -99,17 +184,9 @@ CLog::Release( const std::string& guid /*= ""*/ )
         __Instances.erase(i);
     }
 
-    /*
-    *   关闭完成端口, 并释放完成的资源	
-    */
-    if(_this->__hFile != INVALID_HANDLE_VALUE) {
-        ::CloseHandle(_this->__hFile);
-        _this->__hFile = INVALID_HANDLE_VALUE;
-    }
+    if(_this != NULL)
+        _this->UinitLog();
 
-    _this->CompleteHandle(true);
-    _this->__pIocp->Close();
-    
     return true;
 }
 
@@ -121,14 +198,7 @@ CLog::ReleaseAll()
     std::map<std::string, CLog*>::iterator i = __Instances.begin();
     while(i != __Instances.end())
     {
-        if(i->second->__hFile != INVALID_HANDLE_VALUE) {
-            ::CloseHandle(i->second->__hFile);
-            i->second->__hFile = INVALID_HANDLE_VALUE;
-        }
-
-        i->second->CompleteHandle(true);
-        i->second->__pIocp->Close();
-
+        i->second->UinitLog();
         i = __Instances.erase(i);
     }
 
@@ -139,7 +209,7 @@ CLog::ReleaseAll()
 *	CLog member function
 */
 CLog::CLog()
-    : __pIocp(new CIOCP(1))
+    : __pIocp(new CIOCP())
     , __count(0)
     , __hFile(INVALID_HANDLE_VALUE)
     , __bAlreadyInit(false)
@@ -147,14 +217,16 @@ CLog::CLog()
 {
     __liNextOffset.QuadPart = 0;
 
-    SetConfig(Config());
+    Config cfg = {};
+    SetConfig(cfg);
 }
 
 CLog::~CLog()
 {
-    if(__pIocp) {
+    if(__pIocp) 
+    {
         delete __pIocp;
-        __pIocp = 0;
+               __pIocp = 0;
     }
 }
 
@@ -166,14 +238,25 @@ CLog::SetConfig( const Config& setting )
         __config.logDir = L"{module_dir}\\log\\";
 
     if(setting.fileName.empty())
-        __config.fileName = L"log-%m%d-%H%M.log";
+        __config.fileName = L"log-%Y%m%d.log";
 
     if(setting.dateFormat.empty())
         __config.dateFormat = L"%m-%d %H:%M:%S";
 
     if(setting.prefixion.empty())
+    {
         /*[{time}] [{id}] [{level}] [{file}:{line}]*/
         __config.prefixion = L"[{time}][{level}][{id}]: ";
+    }
+
+    if(setting.maxFileNumber == 0)
+        __config.maxFileNumber = -1;
+
+    if(setting.maxFileSize == 0)
+        __config.maxFileSize = -1;
+
+    if(0 < __config.maxFileSize && __config.maxFileSize < 0x100000)
+        __config.maxFileSize = 0x100000;
 
     return true;
 }
@@ -199,19 +282,26 @@ CLog::GetLevel() const
 bool 
 CLog::InitLog()
 {
-    CAutoLock lock(*__pLock);
-
-    if(__bAlreadyInit) {
+    if(__bAlreadyInit)
         return false;
-    }
-    
-    std::wstring fileName = Format(__config.logDir) + L"\\" + Format(__config.fileName);
-    bool bFileExist = false;
-    do {
-        bFileExist = (::GetFileAttributesW(fileName.c_str()) != INVALID_FILE_ATTRIBUTES);
+ 
+    std::wstring dirPath = Format(__config.logDir);
+    std::wstring fileName = dirPath + L"\\" + Format(__config.fileName);
 
-        if(!bFileExist)
-            ::CreateDirectoryW(Format(__config.logDir).c_str(), 0);
+    /*
+    *   检查目录是否存在
+    *   若不则创建之
+    *   否则尝试执行目录清理流程
+    */
+    if(!detail::FileExists(dirPath))
+        detail::CreateDirectories(dirPath);
+    else
+        CleanStoreDir();
+
+    bool bFileExist = false;
+    do 
+    {
+        bFileExist = detail::FileExists(fileName);
 
         __hFile = ::CreateFileW( 
             fileName.c_str(),
@@ -222,24 +312,116 @@ CLog::InitLog()
             FILE_FLAG_OVERLAPPED,//使用重叠IO
             0);
 
-        if(__hFile == INVALID_HANDLE_VALUE) {
-            fileName.insert(fileName.rfind(L"."), L"_1");
+        if(__hFile != INVALID_HANDLE_VALUE)
+        {
+            ::GetFileSizeEx(__hFile, &__liNextOffset);
+            if(__config.maxFileSize != -1 && 
+               __config.maxFileSize <= __liNextOffset.QuadPart)
+            {
+                /*
+                *   若文件大小超出配置指定的值, 那么跳过此文件尝试创建新文件.
+                */
+                ::CloseHandle(__hFile);
+                              __hFile = INVALID_HANDLE_VALUE;
+            }
+            else
+                break;
         }
 
-    }while( __hFile == INVALID_HANDLE_VALUE );
+        if(__hFile == INVALID_HANDLE_VALUE)
+        {
+            fileName = detail::FileNameIncrement(fileName);
+        }
+    }
+    while(__hFile == INVALID_HANDLE_VALUE);
 
-    ::GetFileSizeEx(__hFile, &__liNextOffset);
+    //创建并关联iocp
+    __pIocp->Create(1);
     __pIocp->AssociateDevice(__hFile, 0 );
+    __count = 0;
 
-    if(!bFileExist) {
+    if(!bFileExist) 
+    {
 #ifdef UNICODE
         /*如果是Unicode则写入BOM, 文件头LE:0xfffe BE:0xfeff*/
         WriteLog(std::wstring(1, 0xfeff));
 #endif
     }
 
-    __bAlreadyInit = true;
-    return true;
+    return __bAlreadyInit = true;
+}
+
+void 
+CLog::UinitLog()
+{
+    //首先尝试释放已经完成的资源, 给予200ms等待时间
+    for(int i = 0; !CompleteHandle() && i < 10; ++i)
+    {
+        ::Sleep(20);
+    }
+
+    //关闭完成端口, 文件, 迫使回收未完成的资源 
+    __pIocp->Close();
+
+    if(__hFile != INVALID_HANDLE_VALUE) 
+    {
+        ::CloseHandle(__hFile);
+                      __hFile = INVALID_HANDLE_VALUE;
+    }
+
+    CompleteHandle(true);
+
+    __bAlreadyInit = false;
+}
+
+void 
+CLog::CleanStoreDir()
+{
+    if(__config.maxFileNumber == -1 && __config.prefixMatch.empty())
+        return;
+
+    std::wstring parentDir = Format(__config.logDir);
+
+    std::multimap<long long, std::wstring> logFiles;
+    {
+        WIN32_FIND_DATAW file_data;
+        HANDLE fd = ::FindFirstFileW((parentDir + L"\\*").c_str(), &file_data);
+
+        while(fd != INVALID_HANDLE_VALUE)
+        {
+            if(file_data.cFileName[0] != L'.')
+            {
+                if(!(file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+                {
+                    std::wstring targetFile = file_data.cFileName;
+                    if(targetFile.find(__config.prefixMatch) !=  targetFile.npos)
+                    {
+                        logFiles.insert(std::make_pair(
+                            long long(file_data.ftCreationTime.dwHighDateTime) << 32 | 
+                            long long(file_data.ftCreationTime.dwLowDateTime),
+                            targetFile));
+                    }
+                }
+            }
+
+            if(::FindNextFileW(fd, &file_data) == FALSE)
+                break;
+        }
+    }
+
+    if(logFiles.size() > size_t(__config.maxFileNumber))
+    {
+        for (int i = 0; i < __config.maxFileNumber; ++i)
+        {
+            logFiles.erase((++logFiles.rbegin()).base());
+        }
+        
+        for(std::multimap<long long, std::wstring>::const_iterator it = logFiles.begin();
+            it != logFiles.end(); ++it)
+        {
+            ::DeleteFileW((parentDir + L"\\" + it->second).c_str());
+        }
+    }
 }
 
 bool 
@@ -254,21 +436,21 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
         /* get已完成的状态，如果pio不为null那么就将其释放 */
         __pIocp->GetStatus( &dwNumBytes, &compKey, (OVERLAPPED**)&pIo, 0 );
 
-        if( NULL != pIo ) { 
+        if( NULL != pIo ) 
+        { 
             ::InterlockedDecrement((LONG*)&__count);
 
             delete pIo; 
-            pIo = NULL; 
+                   pIo = NULL; 
         }
-        else if( !bClose ) {
+        else if( !bClose )
             break;
-        }
 
-        if( bClose && 0 == __count ) { 
+        if( bClose && 0 == __count )
             break;
-        }
     }
-    return true;
+
+    return 0 == __count;
 }
 
 std::wstring 
@@ -283,7 +465,8 @@ CLog::Format( const std::wstring& strBuf, const LogContext& context /*= LogConte
     std::wstring strLine = StrFormat(L"%- 4d", context.line);
     
     std::wstring strLevel;
-    switch(context.level) {
+    switch(context.level) 
+    {
     case LV_ERR: strLevel = L"ERR"; break;
     case LV_WAR: strLevel = L"WAR"; break;
     case LV_APP: strLevel = L"APP"; break;
@@ -315,9 +498,20 @@ CLog::Format( const std::wstring& strBuf, const LogContext& context /*= LogConte
 CLog& 
 CLog::FormatWriteLog( const std::wstring& strBuf, const LogContext& context /*= LogContext()*/ )
 {
-    if(__filterLevel >= context.level) {
-        if(!__bAlreadyInit) {
-            InitLog();
+    if(__filterLevel >= context.level) 
+    {
+        /*
+        *   1. 校验文件大小是否越界
+        *   2. 校验文件是否初始化
+        */
+        {
+            CAutoLock lock(*__pLock);
+
+            if(__config.maxFileSize != -1 && __config.maxFileSize <= __liNextOffset.QuadPart)
+                UinitLog();
+
+            if(!__bAlreadyInit)
+                InitLog();
         }
 
         return WriteLog(Format(__config.prefixion, context) + strBuf + L"\r\n");
@@ -334,7 +528,7 @@ CLog::WriteLog( const std::wstring& strBuf )
     CLogIO* pIo = NULL;
     {
         CAutoLock lock(*__pLock);
-        pIo = new CLogIO(strBuf, __liNextOffset);
+                                   pIo = new CLogIO(strBuf, __liNextOffset);
         __liNextOffset.QuadPart += pIo->Size();
     }
 
