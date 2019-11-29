@@ -286,7 +286,7 @@ CLog::InitLog()
         return false;
  
     std::wstring dirPath = Format(__config.logDir);
-    std::wstring fileName = dirPath + L"\\" + Format(__config.fileName);
+    std::wstring fileName = Format(__config.fileName);
 
     /*
     *   检查目录是否存在
@@ -301,10 +301,10 @@ CLog::InitLog()
     bool bFileExist = false;
     do 
     {
-        bFileExist = detail::FileExists(fileName);
+        bFileExist = detail::FileExists(dirPath + L"\\" + fileName);
 
         __hFile = ::CreateFileW( 
-            fileName.c_str(),
+            (dirPath + L"\\" + fileName).c_str(),
             GENERIC_WRITE,
             FILE_SHARE_READ,     //共享读取
             NULL,
@@ -409,9 +409,11 @@ CLog::CleanStoreDir()
         }
     }
 
-    if(logFiles.size() > size_t(__config.maxFileNumber))
+    // 因稍后即将创建一个文件, 故这里的最大文件数量应该减一
+    size_t maxCount = __config.maxFileNumber - 1;
+    if(logFiles.size() > maxCount)
     {
-        for (int i = 0; i < __config.maxFileNumber; ++i)
+        for (size_t i = 0; i < maxCount; ++i)
         {
             logFiles.erase((++logFiles.rbegin()).base());
         }
