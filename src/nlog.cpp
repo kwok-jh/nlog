@@ -49,7 +49,19 @@ inline bool CreateDirectories(const std::wstring& path)
     if(!FileExists(pdir = FindParentDirectory(pdir)))
         CreateDirectories(pdir);
 
-    return ::CreateDirectoryW(path.c_str(), NULL) != 0;
+    if(::CreateDirectoryW(path.c_str(), NULL) == 0)
+    {
+        switch(::GetLastError())
+        {
+        case ERROR_ALREADY_EXISTS:
+            return true;
+
+        default:
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /*
@@ -294,7 +306,12 @@ CLog::InitLog()
     *   否则尝试执行目录清理流程
     */
     if(!detail::FileExists(dirPath))
-        detail::CreateDirectories(dirPath);
+    {
+        if(!detail::CreateDirectories(dirPath))
+        {
+            return false; //文件夹创建失败
+        }
+    }
     else
         CleanStoreDir();
 
@@ -513,7 +530,8 @@ CLog::FormatWriteLog( const std::wstring& strBuf, const LogContext& context /*= 
                 UinitLog();
 
             if(!__bAlreadyInit)
-                InitLog();
+                if(!InitLog())
+                    return *this;   // 如果初始化失败了, 那么什么也不做, 至少应该保证程序运行
         }
 
         return WriteLog(Format(__config.prefixion, context) + strBuf + L"\r\n");

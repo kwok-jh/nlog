@@ -298,7 +298,6 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 *
 *   _NLOG_SET_CONFIG(cfg);
 */
-
 #define _NLOG_CFG                            nlog::Config
 #define _NLOG_SET_CONFIG(cfg)                nlog::CLog::Instance().SetConfig(cfg)
 #define _NLOG_SET_CONFIG_WITH_ID(id, cfg)    nlog::CLog::Instance(id).SetConfig(cfg)
@@ -324,7 +323,7 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 *                L"",
 *                L"nlog-%m%d%H%M.log",
 *                L"",
-*                L"[{time}][{level}][{id}][{file}:{line}]: "
+*                L"[{time}][{level}][{id}][{file}:{line}]: ",
 *            };
 *    
 *            _NLOG_SET_CONFIG(cfg);
@@ -337,6 +336,7 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 *
 *    static _NLogMgr _NLog;
 */
-#define _NLOG_SHUTDOWN  nlog::CLog::ReleaseAll
+#define _NLOG_SHUTDOWN                      nlog::CLog::ReleaseAll
+#define _NLOG_SHUTDOWN_WITH_ID(id)          nlog::CLog::Release(id)
 
 #endif // nlog_h__
