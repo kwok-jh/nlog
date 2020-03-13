@@ -1,16 +1,17 @@
 #include "nlog.h"
+#include "iocp.hpp"
+#include "simple_lock.hpp"
+
 #include <atltime.h>
 #include <vector>
 #include <algorithm>
 #include <functional>
-#include "iocp.hpp"
-#include "simple_lock.hpp"
 
 namespace nlog {
 namespace detail {
 
 /*
-*	If return true that the file or directory is exists.
+*   If return true that the file or directory is exists.
 *   Otherwise return false.
 */
 inline bool FileExists(const std::wstring& file)
@@ -19,7 +20,7 @@ inline bool FileExists(const std::wstring& file)
 }
 
 /*
-*	Return the parent directory of the specified path.
+*   Return the parent directory of the specified path.
 */
 inline std::wstring FindParentDirectory(const std::wstring& path)
 {
@@ -38,7 +39,7 @@ inline std::wstring FindParentDirectory(const std::wstring& path)
 }
 
 /*
-*	Create directories recursively
+*   Create directories recursively
 */
 inline bool CreateDirectories(const std::wstring& path)
 {
@@ -97,59 +98,90 @@ inline std::wstring FileNameIncrement(const std::wstring& file)
         ++number;
     }
 
-    return copy.replace(leftPos, rightPos - leftPos, TtoWStr(number));
+    return copy.replace(leftPos, rightPos - leftPos, ToWString(number));
+}
+
+/*
+*   1. Format string
+*   2. Replace string
+*   3. Converts a multi-byte string to a wide-byte string.
+*/
+inline std::wstring StringFormat(const wchar_t * format, ...) 
+{  
+    va_list marker = NULL;  
+    va_start(marker, format);
+
+    std::wstring text(_vsctprintf(format, marker) + 1, 0);
+    _vstprintf_s(&text[0], text.capacity(), format, marker);
+    va_end(marker);
+
+    return text.data();
+}
+
+inline std::wstring& StringReplace(
+          std::wstring& target,
+    const std::wstring& before, 
+    const std::wstring& after)
+{  
+    std::wstring::size_type beforeLen = before.length();  
+    std::wstring::size_type afterLen  = after.length();  
+    std::wstring::size_type pos       = target.find(before, 0);
+
+    while( pos != std::wstring::npos ) 
+    {  
+        target.replace(pos, beforeLen, after);  
+        pos = target.find(before, (pos + afterLen));  
+    }
+
+    return target;
+}
+
+inline std::wstring StringToWString(const std::string& str)
+{
+    int len = ::MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
+
+    std::wstring buff(len, 0);
+    ::MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, (LPWSTR)buff.data(), len);
+
+    if(buff[buff.size()-1] == '\0')
+        buff.erase( buff.begin() + (buff.size()-1) );
+
+    return buff;
 }
 
 } // detail
 
 /*
-*	CLogIO used for overlapping IO
+*   CLogIO used for overlapping IO
 */
 class CLogIO : public OVERLAPPED
 {
     std::wstring  __strBuf;
 public:
-    CLogIO()
-    { 
-        Init();
-    }
-
     CLogIO(const std::wstring& strBuf, const LARGE_INTEGER& offset)
     {
-        Init();
+        // 初始化父OVERLAPPED
+        memset(this, 0, sizeof(OVERLAPPED));
 
         __strBuf = strBuf;
         this->Offset = offset.LowPart;
         this->OffsetHigh = offset.HighPart;
     }
 
-    size_t Size() const 
+    int Size() const 
     {
-        return __strBuf.length() * sizeof(std::wstring::value_type);
+        return static_cast<int>(
+            __strBuf.length() * sizeof(std::wstring::value_type));
     }
 
     const wchar_t* szBuf() const
     {
         return __strBuf.c_str();
     }
-
-private:
-    void Init() 
-    {
-        memset(this, 0, sizeof(OVERLAPPED));
-    }
 };
 
 /*
-*	Forward declaration, string format auxiliary function
-*/
-std::wstring  StrFormat(const wchar_t * format, ...);
-std::wstring& StrReplace(std::wstring& target, const std::wstring& before, 
-    const std::wstring& after);
-std::wstring  StrToWStr(const std::string& str);
-
-/*
-*	设置静态成员对象的初始化顺序
+*   设置静态成员对象的初始化顺序
 */
 #ifdef _MSC_VER
 #pragma warning ( push )
@@ -159,7 +191,7 @@ std::wstring  StrToWStr(const std::string& str);
 #endif
 
 /*
-*	CLog static member
+*   CLog static member
 */
 std::map<std::string, CLog*>   CLog::__Instances;
 std::auto_ptr<CSimpleLock>     CLog::__pLock(new CSimpleLock);
@@ -170,14 +202,10 @@ CLog::Instance( const std::string& guid /*= ""*/ )
     CAutoLock lock(*__pLock);
 
     std::map<std::string, CLog*>::iterator it = __Instances.find(guid);
-    if(it == __Instances.end())
-    {
-        CLog* pLog = new CLog();
-        __Instances[guid] = pLog;
-        return *pLog;
-    }
-    else
+    if(it != __Instances.end())
         return *it->second;
+    else
+        return *(__Instances[guid] = new CLog());
 }
 
 bool 
@@ -188,9 +216,8 @@ CLog::Release( const std::string& guid /*= ""*/ )
         CAutoLock lock(*__pLock);
 
         std::map<std::string, CLog*>::iterator i = __Instances.find(guid);
-        if(i == __Instances.end()) {
+        if(i == __Instances.end())
             return false;
-        }
 
         _this = i->second;
         __Instances.erase(i);
@@ -218,13 +245,13 @@ CLog::ReleaseAll()
 }
 
 /*
-*	CLog member function
+*   CLog member function
 */
 CLog::CLog()
     : __pIocp(new CIOCP())
     , __count(0)
     , __hFile(INVALID_HANDLE_VALUE)
-    , __bAlreadyInit(false)
+    , __initFlag(E_UNINIT)
     , __filterLevel(LV_PRO)
 {
     __liNextOffset.QuadPart = 0;
@@ -294,7 +321,7 @@ CLog::GetLevel() const
 bool 
 CLog::InitLog()
 {
-    if(__bAlreadyInit)
+    if(__initFlag != E_UNINIT)
         return false;
  
     std::wstring dirPath = Format(__config.logDir);
@@ -309,12 +336,14 @@ CLog::InitLog()
     {
         if(!detail::CreateDirectories(dirPath))
         {
+            __initFlag = E_FAILED_INIT;
             return false; //文件夹创建失败
         }
     }
     else
         CleanStoreDir();
 
+    int  nTryCount = 50;
     bool bFileExist = false;
     do 
     {
@@ -347,7 +376,15 @@ CLog::InitLog()
 
         if(__hFile == INVALID_HANDLE_VALUE)
         {
-            fileName = detail::FileNameIncrement(fileName);
+            if(--nTryCount > 0)
+            {
+                fileName = detail::FileNameIncrement(fileName);
+            }
+            else
+            {
+                __initFlag = E_FAILED_INIT;
+                return false;
+            }
         }
     }
     while(__hFile == INVALID_HANDLE_VALUE);
@@ -365,7 +402,8 @@ CLog::InitLog()
 #endif
     }
 
-    return __bAlreadyInit = true;
+    __initFlag = E_ALREADY_INIT;
+    return true;
 }
 
 void 
@@ -388,7 +426,7 @@ CLog::UinitLog()
 
     CompleteHandle(true);
 
-    __bAlreadyInit = false;
+    __initFlag = E_UNINIT;
 }
 
 void 
@@ -450,7 +488,12 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
     ULONG_PTR   compKey    = 0;
     CLogIO*     pIo        = 0;
 
-    while(true) 
+    /*
+    *   在某个特殊的时间终止程序, 投递的事件不能全部返回????
+    *   这里临时设置一个重试次数, 大约2秒钟左右
+    */
+    int tryCount = 200;
+    do
     {
         /* get已完成的状态，如果pio不为null那么就将其释放 */
         __pIocp->GetStatus( &dwNumBytes, &compKey, (OVERLAPPED**)&pIo, 0 );
@@ -465,9 +508,17 @@ CLog::CompleteHandle( bool bClose /*= false*/ )
         else if( !bClose )
             break;
 
-        if( bClose && 0 == __count )
-            break;
+        if( bClose )
+        {
+            if( 0 == __count )
+                break;
+            else
+                --tryCount;
+
+            ::Sleep(10);
+        }
     }
+    while(tryCount > 0);
 
     return 0 == __count;
 }
@@ -476,12 +527,12 @@ std::wstring
 CLog::Format( const std::wstring& strBuf, const LogContext& context /*= LogContext()*/ )
 {
     /*
-    *	这里的查找, 还存在大量的性能浪费, 后面可以专门做优化
+    *   这里还存在大量的性能浪费, 后面可以专门做优化
     */
     std::wstring result  = (LPCTSTR)CTime::GetCurrentTime().Format(strBuf.c_str());
     std::wstring strTime = (LPCTSTR)CTime::GetCurrentTime().Format(__config.dateFormat.c_str());
-    std::wstring strId   = StrFormat(L"%- 8X", ::GetCurrentThreadId());
-    std::wstring strLine = StrFormat(L"%- 4d", context.line);
+    std::wstring strId   = detail::StringFormat(L"%- 8X", ::GetCurrentThreadId());
+    std::wstring strLine = detail::StringFormat(L"%- 4d", context.line);
     
     std::wstring strLevel;
     switch(context.level) 
@@ -503,13 +554,13 @@ CLog::Format( const std::wstring& strBuf, const LogContext& context /*= LogConte
         strModule = buffer;
     }
 
-    result = StrReplace(result, L"{module_dir}",strModule);
-    result = StrReplace(result, L"{level}", strLevel);
-    result = StrReplace(result, L"{time}", strTime);
-    result = StrReplace(result, L"{id}", strId);
-    result = StrReplace(result, L"{file}", context.file);
-    result = StrReplace(result, L"{func}", context.func);
-    result = StrReplace(result, L"{line}", strLine);
+    result = detail::StringReplace(result, L"{module_dir}",strModule);
+    result = detail::StringReplace(result, L"{level}", strLevel);
+    result = detail::StringReplace(result, L"{time}", strTime);
+    result = detail::StringReplace(result, L"{id}", strId);
+    result = detail::StringReplace(result, L"{file}", context.file);
+    result = detail::StringReplace(result, L"{func}", context.func);
+    result = detail::StringReplace(result, L"{line}", strLine);
     
     return result;
 }
@@ -529,9 +580,16 @@ CLog::FormatWriteLog( const std::wstring& strBuf, const LogContext& context /*= 
             if(__config.maxFileSize != -1 && __config.maxFileSize <= __liNextOffset.QuadPart)
                 UinitLog();
 
-            if(!__bAlreadyInit)
+            switch(__initFlag)
+            {
+            case E_UNINIT:
                 if(!InitLog())
                     return *this;   // 如果初始化失败了, 那么什么也不做, 至少应该保证程序运行
+                break;
+
+            case E_FAILED_INIT:
+                return *this;
+            }
         }
 
         return WriteLog(Format(__config.prefixion, context) + strBuf + L"\r\n");
@@ -569,7 +627,7 @@ CLog::WriteLog( const std::wstring& strBuf )
 }
 
 /*
-*	CLogHelper firend function
+*   CLogHelper firend function
 */
 CLogHelper& 
 time(CLogHelper& slef, bool append)
@@ -590,9 +648,9 @@ CLogHelper&
 id(CLogHelper& slef, bool append)
 {
     if(append)
-        return slef << StrFormat(L"%- 8X", ::GetCurrentThreadId());
+        return slef << detail::StringFormat(L"%- 8X", ::GetCurrentThreadId());
     else
-        return slef % StrFormat(L"%- 8X", ::GetCurrentThreadId());
+        return slef % detail::StringFormat(L"%- 8X", ::GetCurrentThreadId());
 }
 
 CLogHelper& 
@@ -612,8 +670,8 @@ CLogHelper::CLogHelper(LogLevel level, const char* file, const unsigned int line
     while (*dfile++);
     while (--dfile != file && *dfile != char('\\') && *dfile != char('/'));
 
-    __logInfo.file  = StrToWStr(dfile ? dfile + 1 : "");
-    __logInfo.func  = StrToWStr(dfunc ? dfunc + 1 : "");
+    __logInfo.file  = detail::StringToWString(dfile ? dfile + 1 : "");
+    __logInfo.func  = detail::StringToWString(dfunc ? dfunc + 1 : "");
     __logInfo.line  = line;
     __logInfo.level = level;
 }
@@ -666,7 +724,7 @@ CLogHelper::Format_(const char * format, va_list ap)
     std::string text;
                 text.resize(_vscprintf(format, ap) + 1);
     vsprintf_s(&text[0], text.capacity(), format, ap);
-    return (*this) << StrToWStr(text.data());
+    return (*this) << detail::StringToWString(text.data());
 }
 
 CLogHelper& 
@@ -687,7 +745,7 @@ CLogHelper::operator<<(CLogHelper&(__cdecl* pfn)(CLogHelper &, bool))
 CLogHelper& 
 CLogHelper::operator<<(const std::string& info)
 {
-    return (*this) << StrToWStr(info);
+    return (*this) << detail::StringToWString(info);
 }
 
 CLogHelper& 
@@ -706,7 +764,7 @@ CLogHelper::operator%(CLogHelper&(__cdecl* pfn)(CLogHelper &, bool))
 CLogHelper& 
 CLogHelper::operator%(const std::string& arg)
 {
-    return (*this) % StrToWStr(arg);
+    return (*this) % detail::StringToWString(arg);
 }
 
 CLogHelper& 
@@ -715,54 +773,8 @@ CLogHelper::operator%(const std::wstring& arg)
     std::wstring specifier(5, 0);
     swprintf_s(&specifier[0], specifier.capacity(), L"{%d}", ++__argIndex);
     
-    StrReplace(__strbuf, specifier.c_str(), arg);
+    detail::StringReplace(__strbuf, specifier.c_str(), arg);
     return *this;
-}
-
-/*
-*	string format auxiliary function
-*/
-std::wstring 
-StrFormat(const wchar_t * format, ...) 
-{  
-    va_list marker = NULL;  
-    va_start(marker, format);
-
-    std::wstring text(_vsctprintf(format, marker) + 1, 0);
-    _vstprintf_s(&text[0], text.capacity(), format, marker);
-    va_end(marker);
-
-    return text.data();
-}
-
-std::wstring& 
-StrReplace(std::wstring& target, const std::wstring& before, 
-    const std::wstring& after)
-{  
-    std::wstring::size_type beforeLen = before.length();  
-    std::wstring::size_type afterLen  = after.length();  
-    std::wstring::size_type pos       = target.find(before, 0);
-
-    while( pos != std::wstring::npos ) {  
-        target.replace(pos, beforeLen, after);  
-        pos = target.find(before, (pos + afterLen));  
-    }
-
-    return target;
-}
-
-std::wstring 
-StrToWStr(const std::string& str)
-{
-    size_t len = ::MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
-
-    std::wstring buff(len, 0);
-    ::MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, (LPWSTR)buff.data(), len);
-
-    if(buff[buff.size()-1] == '\0')
-        buff.erase( buff.begin() + (buff.size()-1) );
-
-    return buff;
 }
 
 }// namespace nlog

@@ -1,12 +1,13 @@
 #ifndef iocp_h__
 #define iocp_h__
 
-/*
-*    完成端口的简单封装 
-*    2016-6 By qiling
-*/
+#ifndef  NOMINMAX
+#   define  NOMINMAX
+#endif
 
-#define  WIN32_LEAN_AND_MEAN 
+#ifndef WIN32_LEAN_AND_MEAN
+#   define  WIN32_LEAN_AND_MEAN 
+#endif
 #include <windows.h>
 
 class CIOCP 
@@ -63,10 +64,10 @@ public:
         return false;
     }
     
-    bool AssociateSocket(SOCKET hSocket, ULONG_PTR CompKey) 
+    bool AssociateSocket(HANDLE hSocket, ULONG_PTR CompKey) 
     {
         if (NULL != _hiocp)
-            return AssociateDevice((HANDLE) hSocket, CompKey);
+            return AssociateDevice(hSocket, CompKey);
 
         return false;
     }

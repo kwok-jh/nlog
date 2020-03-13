@@ -50,7 +50,7 @@ class CSimpleLock;
 namespace nlog{
 
 /*
-*	日志等级
+*   日志等级
 */
 enum LogLevel
 {
@@ -61,7 +61,7 @@ enum LogLevel
 };
 
 /*
-*	日志上下文
+*   日志上下文
 */
 struct LogContext
 {
@@ -77,7 +77,7 @@ struct LogContext
 struct Config 
 {
     /*
-    *	日志存储目录      default: "{module_dir}\\log\\"
+    *   日志存储目录      default: "{module_dir}\\log\\"
     *   可选变量:
     *   {module_dir}      当前可执行模块目录, 默认是程序的当前目录
     *    %Y,%m,%d,%H ...  时间日期格式化
@@ -85,21 +85,21 @@ struct Config
     std::wstring logDir;
 
     /*
-    *	文件名格式        default: "log-%Y%m%d.log"    如(log-20180805.log)
+    *   文件名格式        default: "log-%Y%m%d.log"    如(log-20180805.log)
     *   可选变量:
     *   %Y,%m,%d,%H ...   时间日期格式化
     */
     std::wstring fileName;
 
     /*
-    *	日期格式          default: "%m-%d %H:%M:%S"       如(08-05 23:48:06)
+    *   日期格式          default: "%m-%d %H:%M:%S"       如(08-05 23:48:06)
     *   可选变量:
     *   %Y(%y),%m,%d,%H,%M,%S 时间日期格式化 分别是 年,月,日,时,分,秒
     */
     std::wstring dateFormat;
 
     /*
-    *	前缀格式          default: "[{time}][{level}][{id}]: " 
+    *   前缀格式          default: "[{time}][{level}][{id}]: " 
     *                            如([08-05 23:48:06][ERR][2F84    ]: )
     *   可选变量:
     *   {module_dir}      当前可执行模块目录
@@ -121,7 +121,7 @@ struct Config
     std::wstring prefixMatch;
 
     /*
-    *	最大文件数        default: -1
+    *   最大文件数        default: -1
     *   设置[prefixMatch]后方可有效
     *   -1: 文件数量无限制
     *    0: 无效, 将会以默认值代替
@@ -129,7 +129,7 @@ struct Config
     int maxFileNumber;
 
     /*
-    *	最大文件大小      default: -1 单位字节
+    *   最大文件大小      default: -1 单位字节
     *   当单个文件超出指定的大小时, 将创建新的文件
     *     -1: 大小无限制
     *   <1MB: 小于1MB则等于1MB
@@ -189,8 +189,14 @@ private:
     CIOCP*   __pIocp; 
     HANDLE   __hFile;
     Config   __config;
-    bool     __bAlreadyInit;
     LogLevel __filterLevel;
+
+    enum 
+    {
+        E_UNINIT,      
+        E_FAILED_INIT,
+        E_ALREADY_INIT,
+    } __initFlag;
 
     unsigned int  __count;
     LARGE_INTEGER __liNextOffset;
@@ -237,7 +243,7 @@ private:
 };
 
 template<class T>
-inline std::wstring TtoWStr(const T& arg) 
+inline std::wstring ToWString(const T& arg) 
 {
     std::wstringstream temp;
     temp << arg;
@@ -247,23 +253,23 @@ inline std::wstring TtoWStr(const T& arg)
 template<class T> 
 inline CLogHelper& CLogHelper::operator<<(T info) 
 {
-    return *this << nlog::TtoWStr(info);
+    return *this << nlog::ToWString(info);
 }
 
 template<class T> 
 inline CLogHelper& CLogHelper::operator%(T arg) 
 {
-    return *this % nlog::TtoWStr<T>(arg);
+    return *this % nlog::ToWString<T>(arg);
 }
 
-}// namespace nlog
+} // namespace nlog
 
 #ifndef  NLOG_STATIC_LIB
 #   pragma warning( pop )
 #endif
 
 /*
-*	使用默认Log实例, 格式化输出一条信息
+*   使用默认Log实例, 格式化输出一条信息
 *   example:
 *   _NLOG_ERR("hello") << "nlog";
 */
@@ -273,7 +279,7 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 #define _NLOG_PRO  nlog::CLogHelper(nlog::LV_PRO, __FILE__, __LINE__, __FUNCTION__).Format
 
 /*  
-*	使用指定的Log实例, 格式化输出一条信息
+*   使用指定的Log实例, 格式化输出一条信息
 *   example:
 *   #define LOG_UID    "custom log id"
 *   #define LOG_ERR    _NLOG_ERR_WITH_ID(LOG_UID)   
@@ -303,7 +309,7 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 #define _NLOG_SET_CONFIG_WITH_ID(id, cfg)    nlog::CLog::Instance(id).SetConfig(cfg)
 
 /*
-*	设置实时打印等级
+*   设置实时打印等级
 *   example: - 设置只打印警告及以上的日志
 *   
 *   _NLOG_SET_LEVE(LV_WAR); 
@@ -312,7 +318,7 @@ inline CLogHelper& CLogHelper::operator%(T arg)
 #define _NLOG_SET_LEVE_WITH_ID(id, lev)      nlog::CLog::Instance(id).SetLevel(lev)
 
 /*
-*	执行清理工作, 销毁所有存在的nlog实例
+*   执行清理工作, 销毁所有存在的nlog实例
 *   example: - 初始配置与自动销毁
 *
 *   struct _NLogMgr 

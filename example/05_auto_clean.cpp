@@ -17,6 +17,10 @@ int main()
 {
     _NLOG_CFG cfg = {                                //创建日志配置结构       
         L"{module_dir}\\log",                        //日志存储目录    默认是: "{module_dir}\\log\\"
+		/* 
+		*   文件名格式为: auto_clean_分秒, 
+		*   这里精确到秒钟只是为了迫使每一次初始化输出都指向不同的文件;
+		*/
         L"auto_clean_%M%S.log",                      //文件名格式      默认是: "log-%m%d-%H%M.log"
         L"%Y-%m-%d",                                 //日期格式        默认是: "%m-%d %H:%M:%S"
         L"[{time}][{level}][{id}][{file}:{line}]: ", //前缀格式        默认是: "[{time}][{level}][{id}]: "
@@ -47,9 +51,10 @@ int main()
     system("pause");
     _NLOG_APP("这是消息四");
 
+	_NLOG_SHUTDOWN();
+	
     cfg.fileName = L"auto_split_%M%S.log";
     cfg.prefixMatch = L"auto_split_";
-    _NLOG_SHUTDOWN();
     _NLOG_SET_CONFIG(cfg);
 
     printf("采用1MB分割文件\n");

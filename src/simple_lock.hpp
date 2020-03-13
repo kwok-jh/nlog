@@ -3,7 +3,8 @@
 
 /*
 *   应用于Windows平台的简单互斥锁
-*   2018-6 By qiling
+*
+*   2018-6 By kwok-jh
 */
 
 #define  WIN32_LEAN_AND_MEAN 
